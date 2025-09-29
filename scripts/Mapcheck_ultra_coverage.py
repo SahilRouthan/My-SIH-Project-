@@ -1,4 +1,4 @@
-#!/usr/bin/env python3
+﻿#!/usr/bin/env python3
 """
 Verify ultra-optimized train coverage throughout 24 hours
 """
@@ -10,7 +10,7 @@ def parse_time(time_str):
     return datetime.strptime(time_str, '%H:%M:%S').time()
 
 def check_ultra_coverage():
-    with open('ultra_optimized_trains.json', 'r') as f:
+    with open('ultra_Mapoptimized_trains.json', 'r') as f:
         data = json.load(f)
     
     trains = data['trains']
@@ -43,7 +43,7 @@ def check_ultra_coverage():
     print("Hour | Active Trains")
     print("-----|-------------")
     for h in range(24):
-        status = "✅" if hourly_coverage[h] >= 15 else "⚠️" if hourly_coverage[h] >= 10 else "❌"
+        status = "âœ…" if hourly_coverage[h] >= 15 else "âš ï¸" if hourly_coverage[h] >= 10 else "âŒ"
         print(f"{h:2d}:00 | {hourly_coverage[h]:3d} trains {status}")
     
     min_coverage = min(hourly_coverage)
@@ -59,24 +59,24 @@ def check_ultra_coverage():
     
     # Compare with original
     try:
-        with open('optimized_trains.json', 'r') as f:
+        with open('Mapoptimized_trains.json', 'r') as f:
             original_data = json.load(f)
         original_count = len(original_data['trains'])
         reduction = (1 - len(trains) / original_count) * 100
-        print(f"Reduction from original: {original_count} → {len(trains)} ({reduction:.1f}% fewer trains)")
+        print(f"Reduction from original: {original_count} â†’ {len(trains)} ({reduction:.1f}% fewer trains)")
     except:
         pass
     
     if min_coverage > 0:
-        print("✅ Complete 24/7 coverage maintained with minimal trains!")
+        print("âœ… Complete 24/7 coverage maintained with minimal trains!")
         if min_coverage >= 15:
-            print("🎯 Target coverage achieved (15+ trains/hour)")
+            print("ðŸŽ¯ Target coverage achieved (15+ trains/hour)")
         elif min_coverage >= 10:
-            print("⚠️  Acceptable coverage (10+ trains/hour)")
+            print("âš ï¸  Acceptable coverage (10+ trains/hour)")
         else:
-            print("⚠️  Low coverage - may need adjustment")
+            print("âš ï¸  Low coverage - may need adjustment")
     else:
-        print("❌ Coverage gap detected - trains missing during some hours")
+        print("âŒ Coverage gap detected - trains missing during some hours")
 
 if __name__ == "__main__":
     check_ultra_coverage()

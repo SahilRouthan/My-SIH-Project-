@@ -1,4 +1,4 @@
-#!/usr/bin/env python3
+﻿#!/usr/bin/env python3
 """
 Fix train route coordinates to align with actual railway tracks
 Snap train routes to the nearest railway network paths
@@ -28,7 +28,7 @@ def load_railway_network():
     """Load railway network coordinates from GeoJSON"""
     print("Loading railway network...")
     
-    with open('Railways_indian.geojson', 'r', encoding='utf-8') as f:
+    with open('MapRailways_indian.geojson', 'r', encoding='utf-8') as f:
         railway_data = json.load(f)
     
     # Extract all railway track coordinates
@@ -144,9 +144,9 @@ def fix_train_routes():
     
     # Process each optimization level
     files_to_fix = [
-        'minimal_trains.json',
-        'ultra_optimized_trains.json', 
-        'optimized_trains.json'
+        'Mapminimal_trains.json',
+        'ultra_Mapoptimized_trains.json', 
+        'Mapoptimized_trains.json'
     ]
     
     for file_name in files_to_fix:
@@ -221,7 +221,7 @@ def fix_train_routes():
         print(f"Fixed {fixed_count} train routes in {file_name}")
         print(f"Original backed up to {backup_path}")
     
-    print("\n✅ All train routes fixed and aligned with railway tracks!")
+    print("\nâœ… All train routes fixed and aligned with railway tracks!")
     print("Trains will now follow actual railway lines in the simulation.")
 
 if __name__ == "__main__":

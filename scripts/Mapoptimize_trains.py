@@ -1,4 +1,4 @@
-#!/usr/bin/env python3
+﻿#!/usr/bin/env python3
 """
 Create an optimized, smaller train file for fast loading and continuous simulation
 Focus on major routes with guaranteed 24/7 coverage
@@ -122,7 +122,7 @@ def create_optimized_trains():
     """Create optimized train file for fast loading and continuous simulation"""
     
     input_file = Path("daily_running_trains.json")
-    output_file = Path("optimized_trains.json")
+    output_file = Path("Mapoptimized_trains.json")
     
     print(f"Reading from: {input_file}")
     
@@ -221,7 +221,7 @@ def create_optimized_trains():
         # Show file size comparison
         original_size = input_file.stat().st_size / (1024 * 1024)  # MB
         new_size = output_file.stat().st_size / (1024 * 1024)  # MB
-        print(f"File size: {original_size:.1f}MB → {new_size:.1f}MB ({new_size/original_size*100:.1f}% of original)")
+        print(f"File size: {original_size:.1f}MB â†’ {new_size:.1f}MB ({new_size/original_size*100:.1f}% of original)")
         
         # Show top selected trains
         print(f"\nTop 10 selected routes:")

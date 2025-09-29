@@ -1,4 +1,4 @@
-#!/usr/bin/env python3
+﻿#!/usr/bin/env python3
 """
 Verify continuous train coverage throughout 24 hours
 """
@@ -10,7 +10,7 @@ def parse_time(time_str):
     return datetime.strptime(time_str, '%H:%M:%S').time()
 
 def check_coverage():
-    with open('optimized_trains.json', 'r') as f:
+    with open('Mapoptimized_trains.json', 'r') as f:
         data = json.load(f)
     
     trains = data['trains']
@@ -54,9 +54,9 @@ def check_coverage():
     print(f"Average trains per hour: {avg_coverage:.1f}")
     
     if min_coverage > 0:
-        print("✅ Complete 24/7 coverage - trains always running!")
+        print("âœ… Complete 24/7 coverage - trains always running!")
     else:
-        print("⚠️  Some hours have no trains")
+        print("âš ï¸  Some hours have no trains")
 
 if __name__ == "__main__":
     check_coverage()

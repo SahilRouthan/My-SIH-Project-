@@ -1,11 +1,11 @@
-import json
+﻿import json
 from collections import defaultdict
 
 # Load schedule and station data
-with open("schedules.json", "r", encoding="utf-8") as f:
+with open("Mapschedules.json", "r", encoding="utf-8") as f:
     schedules = json.load(f)
 
-with open("stations.json", "r", encoding="utf-8") as f:
+with open("Mapstations.json", "r", encoding="utf-8") as f:
     stations = json.load(f)
 
 # Map station codes -> info
@@ -52,4 +52,4 @@ output_file = "train_routes_full.json"
 with open(output_file, "w", encoding="utf-8") as fo:
     json.dump(final, fo, indent=2, ensure_ascii=False)
 
-print(f"✅ JSON file generated: {output_file}")
+print(f"âœ… JSON file generated: {output_file}")

@@ -1,4 +1,4 @@
-#!/usr/bin/env python3
+﻿#!/usr/bin/env python3
 """
 Verify railway network coverage and train route alignment
 """
@@ -22,7 +22,7 @@ def verify_railway_coverage():
     
     # Load railway network
     try:
-        with open('Railways_indian.geojson', 'r', encoding='utf-8') as f:
+        with open('MapRailways_indian.geojson', 'r', encoding='utf-8') as f:
             railway_data = json.load(f)
     except Exception as e:
         print(f"Error loading railway network: {e}")
@@ -56,21 +56,21 @@ def verify_railway_coverage():
                         max_lng = max(max_lng, lng)
                         total_points += 1
     
-    print("🛤️ Railway Network Coverage:")
+    print("ðŸ›¤ï¸ Railway Network Coverage:")
     print(f"   Latitude range: {min_lat:.2f} to {max_lat:.2f}")
     print(f"   Longitude range: {min_lng:.2f} to {max_lng:.2f}")
     print(f"   Total railway points: {total_points:,}")
     
     # Load train data and check alignment
     try:
-        with open('ultra_optimized_trains.json', 'r', encoding='utf-8') as f:
+        with open('ultra_Mapoptimized_trains.json', 'r', encoding='utf-8') as f:
             train_data = json.load(f)
     except Exception as e:
         print(f"Error loading train data: {e}")
         return
     
     trains = train_data.get('trains', [])
-    print(f"\n🚂 Train Route Analysis:")
+    print(f"\nðŸš‚ Train Route Analysis:")
     print(f"   Total trains: {len(trains)}")
     
     off_track_trains = []
@@ -99,15 +99,15 @@ def verify_railway_coverage():
             })
     
     if off_track_trains:
-        print(f"\n⚠️ Found trains with coordinates outside railway bounds:")
+        print(f"\nâš ï¸ Found trains with coordinates outside railway bounds:")
         for train in off_track_trains:
             percentage = (train['off_track_points'] / train['total_points']) * 100
             print(f"   {train['name']}: {train['off_track_points']}/{train['total_points']} points ({percentage:.1f}%) off bounds")
     else:
-        print(f"\n✅ All checked trains have coordinates within railway network bounds")
+        print(f"\nâœ… All checked trains have coordinates within railway network bounds")
     
     # Sample some specific coordinates
-    print(f"\n📍 Sample train coordinates (first train, first 3 points):")
+    print(f"\nðŸ“ Sample train coordinates (first train, first 3 points):")
     if trains and trains[0].get('route_coordinates'):
         for i, coord in enumerate(trains[0]['route_coordinates'][:3]):
             if len(coord) >= 2:

@@ -1,4 +1,4 @@
-#!/usr/bin/env python3
+﻿#!/usr/bin/env python3
 """
 Verify minimal train coverage throughout 24 hours
 """
@@ -10,7 +10,7 @@ def parse_time(time_str):
     return datetime.strptime(time_str, '%H:%M:%S').time()
 
 def check_minimal_coverage():
-    with open('minimal_trains.json', 'r') as f:
+    with open('Mapminimal_trains.json', 'r') as f:
         data = json.load(f)
     
     trains = data['trains']
@@ -44,15 +44,15 @@ def check_minimal_coverage():
     print("-----|---------------|--------")
     for h in range(24):
         if hourly_coverage[h] >= 20:
-            status = "🟢 Excellent"
+            status = "ðŸŸ¢ Excellent"
         elif hourly_coverage[h] >= 15:
-            status = "✅ Good"
+            status = "âœ… Good"
         elif hourly_coverage[h] >= 10:
-            status = "⚠️  Adequate"
+            status = "âš ï¸  Adequate"
         elif hourly_coverage[h] >= 5:
-            status = "🟡 Low"
+            status = "ðŸŸ¡ Low"
         else:
-            status = "❌ Critical"
+            status = "âŒ Critical"
         print(f"{h:2d}:00 | {hourly_coverage[h]:3d} trains    | {status}")
     
     min_coverage = min(hourly_coverage)
@@ -68,32 +68,32 @@ def check_minimal_coverage():
     
     # File size
     from pathlib import Path
-    file_size = Path('minimal_trains.json').stat().st_size / 1024  # KB
+    file_size = Path('Mapminimal_trains.json').stat().st_size / 1024  # KB
     print(f"File size: {file_size:.0f}KB")
     
     # Compare with previous optimizations
     comparisons = []
     try:
-        with open('optimized_trains.json', 'r') as f:
+        with open('Mapoptimized_trains.json', 'r') as f:
             orig_data = json.load(f)
         orig_count = len(orig_data['trains'])
         orig_routes = orig_data['metadata']['unique_routes']
         reduction = (1 - len(trains) / orig_count) * 100
         route_reduction = (1 - data['metadata']['unique_routes'] / orig_routes) * 100
-        comparisons.append(f"vs Optimized: {orig_count} → {len(trains)} ({reduction:.1f}% fewer trains)")
-        comparisons.append(f"vs Optimized routes: {orig_routes} → {data['metadata']['unique_routes']} ({route_reduction:.1f}% fewer routes)")
+        comparisons.append(f"vs Optimized: {orig_count} â†’ {len(trains)} ({reduction:.1f}% fewer trains)")
+        comparisons.append(f"vs Optimized routes: {orig_routes} â†’ {data['metadata']['unique_routes']} ({route_reduction:.1f}% fewer routes)")
     except:
         pass
     
     try:
-        with open('ultra_optimized_trains.json', 'r') as f:
+        with open('ultra_Mapoptimized_trains.json', 'r') as f:
             ultra_data = json.load(f)
         ultra_count = len(ultra_data['trains'])
         ultra_routes = ultra_data['metadata']['unique_routes']
         reduction = (1 - len(trains) / ultra_count) * 100
         route_reduction = (1 - data['metadata']['unique_routes'] / ultra_routes) * 100
-        comparisons.append(f"vs Ultra-optimized: {ultra_count} → {len(trains)} ({reduction:.1f}% fewer trains)")
-        comparisons.append(f"vs Ultra-optimized routes: {ultra_routes} → {data['metadata']['unique_routes']} ({route_reduction:.1f}% fewer routes)")
+        comparisons.append(f"vs Ultra-optimized: {ultra_count} â†’ {len(trains)} ({reduction:.1f}% fewer trains)")
+        comparisons.append(f"vs Ultra-optimized routes: {ultra_routes} â†’ {data['metadata']['unique_routes']} ({route_reduction:.1f}% fewer routes)")
     except:
         pass
     
@@ -105,17 +105,17 @@ def check_minimal_coverage():
     # Coverage assessment
     print(f"\nCoverage Assessment:")
     if min_coverage > 0:
-        print("✅ Complete 24/7 coverage maintained with MINIMAL trains!")
+        print("âœ… Complete 24/7 coverage maintained with MINIMAL trains!")
         if min_coverage >= 20:
-            print("🎯🎯 EXCELLENT coverage (20+ trains/hour)")
+            print("ðŸŽ¯ðŸŽ¯ EXCELLENT coverage (20+ trains/hour)")
         elif min_coverage >= 15:
-            print("🎯 TARGET coverage achieved (15+ trains/hour)")
+            print("ðŸŽ¯ TARGET coverage achieved (15+ trains/hour)")
         elif min_coverage >= 10:
-            print("⚠️  ADEQUATE coverage (10+ trains/hour)")
+            print("âš ï¸  ADEQUATE coverage (10+ trains/hour)")
         else:
-            print("🟡 LOW coverage - consider adding trains")
+            print("ðŸŸ¡ LOW coverage - consider adding trains")
     else:
-        print("❌ Coverage gap detected - trains missing during some hours")
+        print("âŒ Coverage gap detected - trains missing during some hours")
     
     # Efficiency metrics
     efficiency = len(trains) / data['metadata']['unique_routes']

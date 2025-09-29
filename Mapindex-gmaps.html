@@ -1,4 +1,4 @@
-<!DOCTYPE html>
+﻿<!DOCTYPE html>
 <html>
 <head>
   <meta charset="utf-8" />
@@ -32,7 +32,7 @@
 </head>
 <body>
   <div id="map"></div>
-  <div class="status" id="status">Loading Google Map…</div>
+  <div class="status" id="status">Loading Google Mapâ€¦</div>
   <div class="legend" id="legend" hidden>
     <div><strong>Scheduled Trains</strong></div>
     <div id="legendItems"></div>
@@ -60,7 +60,7 @@
         fullscreenControl: true,
         restriction: { latLngBounds: INDIA_BOUNDS, strictBounds: true },
       });
-      setStatus('Map ready. Loading railways…');
+      setStatus('Map ready. Loading railwaysâ€¦');
 
       // Style for railways
       map.data.setStyle({
@@ -68,11 +68,11 @@
       });
 
       // Load railway GeoJSON
-      fetch('Railways_indian.geojson')
+      fetch('MapRailways_indian.geojson')
         .then(r => r.ok ? r.json() : Promise.reject(`HTTP ${r.status}`))
         .then(geo => {
           map.data.addGeoJson(geo);
-          setStatus('Railways loaded. Loading trains…');
+          setStatus('Railways loaded. Loading trainsâ€¦');
           // Fit to bounds of data if possible
           try {
             const bounds = new google.maps.LatLngBounds();
@@ -87,12 +87,12 @@
             if (!bounds.isEmpty()) map.fitBounds(bounds);
           } catch {}
           // Start sample routes realtime
-          startSampleRoutesRealtime('ultra_optimized_trains.json');
+          startSampleRoutesRealtime('ultra_Mapoptimized_trains.json');
         })
         .catch(err => {
           console.error('Railways load failed:', err);
-          setStatus('Failed to load Railways_indian.geojson');
-          startSampleRoutesRealtime('ultra_optimized_trains.json');
+          setStatus('Failed to load MapRailways_indian.geojson');
+          startSampleRoutesRealtime('ultra_Mapoptimized_trains.json');
         });
     }
 

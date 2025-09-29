@@ -1,4 +1,4 @@
-#!/usr/bin/env python3
+﻿#!/usr/bin/env python3
 """
 Create MINIMAL trains with MAXIMUM 24/7 coverage efficiency
 Absolute minimum trains required for continuous simulation
@@ -135,8 +135,8 @@ def create_minimal_timing_strategy(base_departure, base_arrival, efficiency_leve
 def create_minimal_maximal_trains():
     """Create MINIMAL trains with MAXIMAL 24/7 coverage"""
     
-    input_file = Path("optimized_trains.json")
-    output_file = Path("minimal_trains.json")
+    input_file = Path("Mapoptimized_trains.json")
+    output_file = Path("Mapminimal_trains.json")
     
     print(f"Reading from: {input_file}")
     
@@ -251,7 +251,7 @@ def create_minimal_maximal_trains():
         # Show file size comparison
         original_size = input_file.stat().st_size / (1024 * 1024)  # MB
         new_size = output_file.stat().st_size / 1024  # KB
-        print(f"File size: {original_size:.1f}MB → {new_size:.0f}KB ({new_size/(original_size*1024)*100:.1f}% of original)")
+        print(f"File size: {original_size:.1f}MB â†’ {new_size:.0f}KB ({new_size/(original_size*1024)*100:.1f}% of original)")
         
         # Show top selected trains
         print(f"\nTop 10 maximum-efficiency routes:")

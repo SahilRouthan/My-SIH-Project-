@@ -1,4 +1,4 @@
-#!/usr/bin/env python3
+﻿#!/usr/bin/env python3
 """
 Ultra-optimized train file for minimal trains with guaranteed 24/7 coverage
 Focus on absolute minimum trains required for continuous simulation
@@ -186,8 +186,8 @@ def ensure_24x7_coverage(trains_with_schedules):
 def create_ultra_optimized_trains():
     """Create ultra-minimal train file with guaranteed 24/7 coverage"""
     
-    input_file = Path("optimized_trains.json")  # Use current optimized file as source
-    output_file = Path("ultra_optimized_trains.json")
+    input_file = Path("Mapoptimized_trains.json")  # Use current optimized file as source
+    output_file = Path("ultra_Mapoptimized_trains.json")
     
     print(f"Reading from: {input_file}")
     
@@ -305,7 +305,7 @@ def create_ultra_optimized_trains():
         # Show file size comparison
         original_size = input_file.stat().st_size / (1024 * 1024)  # MB
         new_size = output_file.stat().st_size / 1024  # KB
-        print(f"File size: {original_size:.1f}MB → {new_size:.0f}KB ({new_size/(original_size*1024)*100:.1f}% of original)")
+        print(f"File size: {original_size:.1f}MB â†’ {new_size:.0f}KB ({new_size/(original_size*1024)*100:.1f}% of original)")
         
         # Show top selected trains
         print(f"\nTop 10 ultra-priority routes:")

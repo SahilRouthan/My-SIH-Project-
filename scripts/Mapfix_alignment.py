@@ -1,4 +1,4 @@
-#!/usr/bin/env python3
+﻿#!/usr/bin/env python3
 """
 Fix train route alignment with railway network
 """
@@ -20,7 +20,7 @@ def distance_km(lat1, lng1, lat2, lng2):
 def load_railway_network():
     """Load and process railway network from GeoJSON"""
     try:
-        with open('Railways_indian.geojson', 'r', encoding='utf-8') as f:
+        with open('MapRailways_indian.geojson', 'r', encoding='utf-8') as f:
             data = json.load(f)
         
         # Extract all railway coordinates
@@ -71,7 +71,7 @@ def align_train_routes():
     
     # Load train data
     try:
-        with open('ultra_optimized_trains.json', 'r', encoding='utf-8') as f:
+        with open('ultra_Mapoptimized_trains.json', 'r', encoding='utf-8') as f:
             train_data = json.load(f)
     except Exception as e:
         print(f"Error loading train data: {e}")
@@ -127,17 +127,17 @@ def align_train_routes():
     
     # Save aligned data
     try:
-        with open('ultra_optimized_trains_aligned.json', 'w', encoding='utf-8') as f:
+        with open('Mapultra_optimized_trains_aligned.json', 'w', encoding='utf-8') as f:
             json.dump(train_data, f, indent=1)
         
-        print(f"\n✅ SUCCESS: Aligned {aligned_count}/{total_trains} train routes")
-        print(f"📁 Saved to: ultra_optimized_trains_aligned.json")
-        print(f"🛤️  Railway alignment complete!")
+        print(f"\nâœ… SUCCESS: Aligned {aligned_count}/{total_trains} train routes")
+        print(f"ðŸ“ Saved to: Mapultra_optimized_trains_aligned.json")
+        print(f"ðŸ›¤ï¸  Railway alignment complete!")
         
         # Replace original file
         import shutil
-        shutil.copy('ultra_optimized_trains_aligned.json', 'ultra_optimized_trains.json')
-        print("📋 Original file updated with aligned coordinates")
+        shutil.copy('Mapultra_optimized_trains_aligned.json', 'ultra_Mapoptimized_trains.json')
+        print("ðŸ“‹ Original file updated with aligned coordinates")
         
     except Exception as e:
         print(f"Error saving aligned data: {e}")

@@ -1,7 +1,7 @@
-#!/usr/bin/env python3
+﻿#!/usr/bin/env python3
 """
 Fix train routes to align with actual railway tracks
-Snap train coordinates to the nearest railway lines from Railways_indian.geojson
+Snap train coordinates to the nearest railway lines from MapRailways_indian.geojson
 """
 
 import json
@@ -67,8 +67,8 @@ def create_railway_aligned_routes():
     """Create railway-aligned train routes"""
     
     # Load railway network
-    railway_file = Path("Railways_indian.geojson")
-    train_file = Path("ultra_optimized_trains.json")
+    railway_file = Path("MapRailways_indian.geojson")
+    train_file = Path("ultra_Mapoptimized_trains.json")
     output_file = Path("ultra_optimized_trains_fixed.json")
     
     print(f"Loading railway network from: {railway_file}")
@@ -128,7 +128,7 @@ def create_railway_aligned_routes():
         output_data['trains'] = fixed_trains
         output_data['metadata']['railway_alignment'] = {
             'aligned': True,
-            'railway_network_file': 'Railways_indian.geojson',
+            'railway_network_file': 'MapRailways_indian.geojson',
             'alignment_method': 'snap_to_nearest_railway_line',
             'total_trains_processed': len(trains),
             'successfully_aligned': len([t for t in fixed_trains if t.get('metadata', {}).get('route_aligned')])
@@ -152,7 +152,7 @@ def create_railway_aligned_routes():
         # Show file sizes
         original_size = train_file.stat().st_size / 1024  # KB
         new_size = output_file.stat().st_size / 1024  # KB
-        print(f"File size: {original_size:.0f}KB → {new_size:.0f}KB")
+        print(f"File size: {original_size:.0f}KB â†’ {new_size:.0f}KB")
         
         return True
         
