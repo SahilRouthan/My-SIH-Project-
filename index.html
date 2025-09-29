@@ -637,10 +637,10 @@
       const departMs = startNow ? 0 : parseDepartOffsetMs(entry.depart ?? entry.departAt ?? entry.departure ?? entry.departureTime ?? 0);
       const latlngObjs = routeObj.latlngs;
 
-      // Optimized polyline rendering - only for small numbers and high zoom
-      const shouldShowLine = trainRoutes.length < 30 && map.getZoom() > 6;
+      // Ultra-optimized polyline rendering - minimal visual load
+      const shouldShowLine = trainRoutes.length < 20 && map.getZoom() > 7;
       const line = shouldShowLine ? 
-        L.polyline(latlngObjs, { color, weight: 1.5, opacity: 0.6 }).addTo(map) : 
+        L.polyline(latlngObjs, { color, weight: 1, opacity: 0.5 }).addTo(map) : 
         null;
       const icon = L.divIcon({ className: 'train-icon', html: '🚆', iconSize: [22,22] });
   const marker = L.marker(latlngObjs[0], { icon });
@@ -915,7 +915,7 @@
     // Removed button event listeners - using map-only interface
     // Load railway tracks and build graph
     const railwayReady = fetch('Railways_indian.geojson').then(r => r.json()).then(data => {
-      railwayLayer = L.geoJSON(data, { style: { color: '#1e88e5', weight: 0.5, opacity: 0.6 } }).addTo(map);
+      railwayLayer = L.geoJSON(data, { style: { color: '#1e88e5', weight: 0.3, opacity: 0.4 } }).addTo(map);
       const stats = buildGraphFromGeoJSON(data);
       setStatus(`Railway loaded: ${stats.nodeCount.toLocaleString()} nodes, ${stats.edgeCount.toLocaleString()} edges.`);
       console.log(`Railway network ready: ${nodeKeys.length} nodes available for snapping`);
@@ -1157,7 +1157,7 @@
           console.log(`Found ${trains.length} trains in dataset`);
           sampleSimRoutes = [];
           const params = new URLSearchParams(window.location.search);
-          const sampleLimit = Number(params.get('sampleLimit') || 50); // Further optimized for smoothness
+          const sampleLimit = Number(params.get('sampleLimit') || 100); // Increased for better simulation coverage
           let added = 0;
           for (const tr of trains) {
             if (added >= sampleLimit) break;
@@ -1206,10 +1206,11 @@
             setStatus('No valid train routes found');
             return;
           }
-          console.log(`Starting simulation with ${sampleSimRoutes.length} trains`);
+          console.log(`Starting optimized simulation with ${sampleSimRoutes.length} trains`);
           let tickCount = 0;
           let frameCount = 0;
           let lastFPSTime = performance.now();
+          const speedMultiplier = 2; // Make trains move 2x faster for more dynamic simulation
           
           // Performance monitoring
           function updatePerformance(activeTrains) {
@@ -1225,7 +1226,7 @@
           }
           
           const tick = () => {
-            const baseNow = nowSecOfDay();
+            const baseNow = nowSecOfDay() * speedMultiplier; // Accelerated time for faster movement
             const showByZoom = map.getZoom() >= markerVisibilityZoom;
             const offsets = [-86400, 0, 86400];
             let activeTrains = 0;
@@ -1238,17 +1239,10 @@
                 const r = (tNow - tr.t0) / (tr.t1 - tr.t0);
                 const targetKm = r * tr.totalKm;
                 pos = posAlongPolyline(tr.coords, tr.cum, targetKm);
-                // ALWAYS snap to track - no exceptions to prevent off-track trains
-                if (pos) {
-                  const originalPos = [pos[0], pos[1]];
+                // Optimized snapping - less frequent for faster performance
+                if (pos && tickCount % 2 === 0) { // Snap every 2nd frame for better performance
                   const snapped = snapToTrackStrict(pos[0], pos[1]);
                   pos = [snapped.lat, snapped.lng];
-                  
-                  // Log only extreme alignment corrections to reduce console spam
-                  const alignmentDist = haversineKm(originalPos[0], originalPos[1], pos[0], pos[1]);
-                  if (alignmentDist > 50) {
-                    console.warn(`Train ${tr.id} aligned ${alignmentDist.toFixed(1)}km to railway - check route data`);
-                  }
                 }
                 break;
               }
@@ -1266,6 +1260,7 @@
                   m.addTo(realtimeLayer);
                   realtimeMarkerById.set(id, m);
                 } else {
+                  // Fast position update for smooth train movement
                   m.setLatLng(pos);
                   m.setOpacity(showByZoom ? 1 : 0);
                 }
@@ -1274,15 +1269,10 @@
                 if (tState && tState.marker) {
                   tState.externalControlled = true;
                   tState.externalUntil = Date.now() + 30000;
-                  // Optimized DOM updates - only when visible and position changed
+                  // Fast DOM updates - update every frame for smooth movement
                   if (showTrainMarkers) {
-                    const currentPos = tState.marker.getLatLng();
-                    const posChanged = Math.abs(currentPos.lat - pos[0]) > 0.0001 || 
-                                      Math.abs(currentPos.lng - pos[1]) > 0.0001;
-                    if (posChanged) {
-                      tState.marker.setLatLng(pos);
-                      setMarkerVisible(tState.marker, showByZoom);
-                    }
+                    tState.marker.setLatLng(pos);
+                    setMarkerVisible(tState.marker, showByZoom);
                   }
                 }
               } catch (error) {
@@ -1293,13 +1283,13 @@
             // Update performance metrics and debug output
             updatePerformance(activeTrains);
             tickCount++;
-            if (tickCount % 30 === 0) { // Less frequent logging for better performance
-              console.log(`Tick ${tickCount}: ${activeTrains}/${sampleSimRoutes.length} trains active, zoom: ${map.getZoom()}`);
-              // Clean up old markers to prevent memory issues
-              if (realtimeMarkerById.size > 100) {
+            if (tickCount % 60 === 0) { // Much less frequent logging for maximum performance
+              console.log(`${activeTrains}/${sampleSimRoutes.length} trains active`);
+              // Efficient memory cleanup
+              if (realtimeMarkerById.size > 150) {
                 const now = Date.now();
                 for (const [id, lastSeen] of realtimeSeenAt.entries()) {
-                  if (now - lastSeen > 60000) { // Remove markers not seen for 1 minute
+                  if (now - lastSeen > 90000) { // Longer retention for better performance
                     const marker = realtimeMarkerById.get(id);
                     if (marker) {
                       map.removeLayer(marker);
@@ -1313,9 +1303,9 @@
           };
           tick();
           if (sampleSimInterval) clearInterval(sampleSimInterval);
-          // Use requestAnimationFrame for smoother updates with throttling
+          // Ultra-smooth animation with 60 FPS for faster, responsive simulation
           let lastUpdate = 0;
-          const targetFPS = 30; // Target 30 FPS
+          const targetFPS = 60; // Increased to 60 FPS for ultra-smooth animation
           const frameInterval = 1000 / targetFPS;
           
           function smoothTick() {
