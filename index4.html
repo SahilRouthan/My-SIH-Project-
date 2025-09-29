@@ -1,0 +1,388 @@
+<!DOCTYPE html>
+<html>
+<head>
+  <meta charset="utf-8" />
+  <title>India Railway Router · Start → End on Tracks</title>
+  <link rel="stylesheet" href="https://unpkg.com/leaflet/dist/leaflet.css" />
+  <script src="https://unpkg.com/leaflet/dist/leaflet.js"></script>
+  <style>
+    #map { height: 100vh; }
+    .controls {
+      position: absolute;
+      z-index: 1000;
+      top: 10px;
+      left: 10px;
+      background: rgba(255,255,255,0.95);
+      padding: 10px;
+      border-radius: 6px;
+      box-shadow: 0 2px 10px rgba(0,0,0,0.15);
+      display: flex;
+      gap: 8px;
+      align-items: center;
+      flex-wrap: wrap;
+    }
+    .controls select, .controls button {
+      font-size: 14px;
+      padding: 6px 8px;
+    }
+    .status {
+      position: absolute;
+      z-index: 1000;
+      bottom: 10px;
+      left: 10px;
+      background: rgba(0,0,0,0.6);
+      color: #fff;
+      padding: 8px 10px;
+      border-radius: 6px;
+      font-family: system-ui, Arial, sans-serif;
+      font-size: 13px;
+      max-width: 50ch;
+    }
+    .train-icon { font-size: 20px; }
+  </style>
+</head>
+<body>
+  <div class="controls">
+    <label>From
+      <select id="startSelect" disabled>
+        <option>Loading stations…</option>
+      </select>
+    </label>
+    <label>To
+      <select id="endSelect" disabled>
+        <option>Loading stations…</option>
+      </select>
+    </label>
+    <button id="btnFindStart" disabled>Start</button>
+    <button id="btnPause" disabled>Pause</button>
+    <button id="btnReset" disabled>Reset</button>
+  </div>
+  <div id="map"></div>
+  <div class="status" id="status">Loading railway network…</div>
+
+  <script>
+    // Initialize map centered on India
+    const map = L.map('map').setView([22.8, 79.5], 5);
+    L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
+      attribution: '© OpenStreetMap contributors'
+    }).addTo(map);
+
+    // Layers and global state
+    let railwayLayer = null;
+    let stationLayer = null;
+    const stationIndex = new Map(); // name -> {lat, lng}
+
+    // Graph of railway vertices
+    const graph = new Map(); // key -> { lat, lng, neighbors: Map(key, distanceKm) }
+    const nodeKeys = []; // list of keys for iteration
+    const keyOf = (lat, lng) => `${lat.toFixed(5)},${lng.toFixed(5)}`; // dedupe tolerance ~1m-10m
+
+    const toLatLng = (coord) => [coord[1], coord[0]]; // [lng, lat] -> [lat, lng]
+
+    function haversineKm(lat1, lon1, lat2, lon2) {
+      const R = 6371;
+      const toRad = x => x * Math.PI / 180;
+      const dLat = toRad(lat2 - lat1);
+      const dLon = toRad(lon2 - lon1);
+      const a = Math.sin(dLat/2)**2 + Math.cos(toRad(lat1))*Math.cos(toRad(lat2))*Math.sin(dLon/2)**2;
+      return 2 * R * Math.atan2(Math.sqrt(a), Math.sqrt(1 - a));
+    }
+
+    function ensureNode(lat, lng) {
+      const k = keyOf(lat, lng);
+      if (!graph.has(k)) {
+        graph.set(k, { lat, lng, neighbors: new Map() });
+        nodeKeys.push(k);
+      }
+      return graph.get(k);
+    }
+
+    function addEdge(lat1, lng1, lat2, lng2) {
+      const n1 = ensureNode(lat1, lng1);
+      const n2 = ensureNode(lat2, lng2);
+      const k1 = keyOf(lat1, lng1);
+      const k2 = keyOf(lat2, lng2);
+      const d = haversineKm(lat1, lng1, lat2, lng2);
+      const setMin = (from, to, dist) => {
+        const cur = from.neighbors.get(to);
+        if (cur === undefined || dist < cur) from.neighbors.set(to, dist);
+      };
+      setMin(n1, k2, d);
+      setMin(n2, k1, d);
+    }
+
+    function findNearestNode(lat, lng) {
+      let bestKey = null;
+      let bestDist = Infinity;
+      for (const k of nodeKeys) {
+        const n = graph.get(k);
+        const d = haversineKm(lat, lng, n.lat, n.lng);
+        if (d < bestDist) {
+          bestDist = d;
+          bestKey = k;
+        }
+      }
+      return { key: bestKey, distKm: bestDist };
+    }
+
+    // Min-heap priority queue for Dijkstra
+    class MinHeap {
+      constructor() { this.a = []; }
+      push(item) { this.a.push(item); this.bubbleUp(this.a.length - 1); }
+      bubbleUp(i) {
+        while (i > 0) {
+          const p = Math.floor((i - 1) / 2);
+          if (this.a[p][0] <= this.a[i][0]) break;
+          [this.a[p], this.a[i]] = [this.a[i], this.a[p]]; i = p;
+        }
+      }
+      pop() {
+        if (this.a.length === 0) return undefined;
+        const top = this.a[0];
+        const end = this.a.pop();
+        if (this.a.length > 0) { this.a[0] = end; this.sinkDown(0); }
+        return top;
+      }
+      sinkDown(i) {
+        const n = this.a.length;
+        while (true) {
+          let l = 2*i + 1, r = 2*i + 2, s = i;
+          if (l < n && this.a[l][0] < this.a[s][0]) s = l;
+          if (r < n && this.a[r][0] < this.a[s][0]) s = r;
+          if (s === i) break;
+          [this.a[i], this.a[s]] = [this.a[s], this.a[i]]; i = s;
+        }
+      }
+      get length() { return this.a.length; }
+    }
+
+    function dijkstra(startKey, endKey) {
+      const dist = new Map();
+      const prev = new Map();
+      const heap = new MinHeap();
+      for (const k of nodeKeys) dist.set(k, Infinity);
+      dist.set(startKey, 0);
+      heap.push([0, startKey]);
+      const visited = new Set();
+
+      while (heap.length) {
+        const [d, u] = heap.pop();
+        if (visited.has(u)) continue;
+        visited.add(u);
+        if (u === endKey) break;
+        const uNode = graph.get(u);
+        for (const [v, w] of uNode.neighbors) {
+          const nd = d + w;
+          if (nd < dist.get(v)) {
+            dist.set(v, nd);
+            prev.set(v, u);
+            heap.push([nd, v]);
+          }
+        }
+      }
+
+      if (!prev.has(endKey) && startKey !== endKey) return null;
+      // Reconstruct path
+      const path = [];
+      let cur = endKey;
+      path.push(cur);
+      while (cur !== startKey) {
+        const p = prev.get(cur);
+        if (!p) break; // start==end or no path
+        path.push(p);
+        cur = p;
+      }
+      path.reverse();
+      return path;
+    }
+
+    // UI elements
+    const startSelect = document.getElementById('startSelect');
+    const endSelect = document.getElementById('endSelect');
+    const btnStart = document.getElementById('btnFindStart');
+    const btnPause = document.getElementById('btnPause');
+    const btnReset = document.getElementById('btnReset');
+    const statusEl = document.getElementById('status');
+
+    // Train animation state
+    let trainMarker = null;
+    let routeLine = null;
+    let animTimer = null;
+    let paused = false;
+    let routeLatLngs = [];
+    let segIndex = 0;
+    let segOffsetKm = 0;
+    const speedKmh = 80; // adjustable speed
+    const tickMs = 100;  // update interval
+
+    function setStatus(msg) { statusEl.textContent = msg; }
+
+    function enableUI() {
+      startSelect.disabled = false;
+      endSelect.disabled = false;
+      btnStart.disabled = false;
+      btnPause.disabled = true;
+      btnReset.disabled = true;
+    }
+
+    function populateStationSelects(features) {
+      const names = [];
+      for (const f of features) {
+        const name = f.properties && (f.properties.name ?? f.properties['name:en'] ?? f.properties['Name']);
+        if (!name) continue;
+        const [lng, lat] = f.geometry.coordinates;
+        stationIndex.set(name, { lat, lng });
+        names.push(name);
+      }
+      names.sort((a,b) => a.localeCompare(b));
+      startSelect.innerHTML = '';
+      endSelect.innerHTML = '';
+      for (const n of names) {
+        const o1 = document.createElement('option'); o1.value = n; o1.textContent = n; startSelect.appendChild(o1);
+        const o2 = document.createElement('option'); o2.value = n; o2.textContent = n; endSelect.appendChild(o2);
+      }
+      // Preselect two common stations if present
+      if (stationIndex.has('Amritsar Junction')) startSelect.value = 'Amritsar Junction';
+      if (stationIndex.has('New Delhi')) endSelect.value = 'New Delhi';
+    }
+
+    function buildGraphFromGeoJSON(data) {
+      let lineCount = 0, edgeCount = 0;
+      const addLine = (coords) => {
+        for (let i = 0; i < coords.length - 1; i++) {
+          const [lng1, lat1] = coords[i];
+          const [lng2, lat2] = coords[i+1];
+          addEdge(lat1, lng1, lat2, lng2);
+          edgeCount++;
+        }
+        lineCount++;
+      };
+      for (const f of data.features) {
+        const g = f.geometry;
+        if (!g) continue;
+        if (g.type === 'LineString') addLine(g.coordinates);
+        else if (g.type === 'MultiLineString') {
+          for (const part of g.coordinates) addLine(part);
+        }
+      }
+      return { lineCount, edgeCount, nodeCount: nodeKeys.length };
+    }
+
+    function computeRoute(startName, endName) {
+      const s = stationIndex.get(startName);
+      const e = stationIndex.get(endName);
+      if (!s || !e) { alert('Select valid start and end stations.'); return null; }
+      const nearS = findNearestNode(s.lat, s.lng);
+      const nearE = findNearestNode(e.lat, e.lng);
+      setStatus(`Nearest track nodes: start ${nearS.distKm.toFixed(2)} km, end ${nearE.distKm.toFixed(2)} km away. Finding path…`);
+      const pathKeys = dijkstra(nearS.key, nearE.key);
+      if (!pathKeys || pathKeys.length === 0) return null;
+      return pathKeys.map(k => {
+        const n = graph.get(k); return [n.lat, n.lng];
+      });
+    }
+
+    function startAnimation(latlngs) {
+      // Cleanup previous
+      if (animTimer) { clearInterval(animTimer); animTimer = null; }
+      if (routeLine) { map.removeLayer(routeLine); routeLine = null; }
+      if (trainMarker) { map.removeLayer(trainMarker); trainMarker = null; }
+
+      if (!latlngs || latlngs.length < 2) { alert('No route to animate.'); return; }
+
+      routeLatLngs = latlngs.map(p => ({ lat: p[0], lng: p[1] }));
+      routeLine = L.polyline(routeLatLngs, { color: 'limegreen', weight: 4 }).addTo(map);
+      map.fitBounds(routeLine.getBounds(), { padding: [30, 30] });
+
+      const icon = L.divIcon({ className: 'train-icon', html: '🚆', iconSize: [24,24] });
+      trainMarker = L.marker(routeLatLngs[0], { icon: icon }).addTo(map);
+
+      segIndex = 0;
+      segOffsetKm = 0;
+      paused = false;
+      btnPause.textContent = 'Pause';
+      btnPause.disabled = false;
+      btnReset.disabled = false;
+
+      const kmPerTick = speedKmh * (tickMs / 3600000);
+      animTimer = setInterval(() => {
+        if (paused) return;
+        if (segIndex >= routeLatLngs.length - 1) {
+          clearInterval(animTimer); animTimer = null; setStatus('Arrived.'); return;
+        }
+        const a = routeLatLngs[segIndex];
+        const b = routeLatLngs[segIndex + 1];
+        const segKm = haversineKm(a.lat, a.lng, b.lat, b.lng);
+        if (segKm === 0) { segIndex++; segOffsetKm = 0; return; }
+        segOffsetKm += kmPerTick;
+        if (segOffsetKm >= segKm) {
+          segIndex++;
+          segOffsetKm = 0;
+          trainMarker.setLatLng([b.lat, b.lng]);
+        } else {
+          const t = segOffsetKm / segKm;
+          const lat = a.lat + (b.lat - a.lat) * t;
+          const lng = a.lng + (b.lng - a.lng) * t;
+          trainMarker.setLatLng([lat, lng]);
+        }
+        if (segIndex % 50 === 0) { // occasional update
+          setStatus(`En route… segment ${segIndex+1}/${routeLatLngs.length-1}`);
+        }
+      }, tickMs);
+    }
+
+    btnStart.addEventListener('click', () => {
+      const s = startSelect.value;
+      const e = endSelect.value;
+      if (!s || !e || s === e) { alert('Pick two distinct stations.'); return; }
+      setStatus('Computing route on tracks…');
+      const route = computeRoute(s, e);
+      if (!route) { setStatus('No route found between selected stations.'); alert('No railway path found.'); return; }
+      startAnimation(route);
+      setStatus('Animating on-track route.');
+    });
+
+    btnPause.addEventListener('click', () => {
+      if (!animTimer) return;
+      paused = !paused;
+      btnPause.textContent = paused ? 'Resume' : 'Pause';
+      setStatus(paused ? 'Paused.' : 'Animating…');
+    });
+
+    btnReset.addEventListener('click', () => {
+      if (animTimer) { clearInterval(animTimer); animTimer = null; }
+      if (routeLine) { map.removeLayer(routeLine); routeLine = null; }
+      if (trainMarker) { map.removeLayer(trainMarker); trainMarker = null; }
+      segIndex = 0; segOffsetKm = 0; paused = false;
+      btnPause.textContent = 'Pause';
+      btnPause.disabled = true;
+      btnReset.disabled = true;
+      setStatus('Ready. Choose start and end, then Start.');
+    });
+
+    // Load railway tracks and build graph
+    fetch('india_railways.geojson').then(r => r.json()).then(data => {
+      railwayLayer = L.geoJSON(data, { style: { color: '#1e88e5', weight: 1 } }).addTo(map);
+      const stats = buildGraphFromGeoJSON(data);
+      setStatus(`Railway loaded: ${stats.nodeCount.toLocaleString()} nodes, ${stats.edgeCount.toLocaleString()} edges.`);
+    }).catch(err => {
+      console.error(err); setStatus('Failed to load india_railways.geojson');
+    });
+
+    // Load stations and populate selects + map
+    fetch('railway_station.geojson').then(r => r.json()).then(data => {
+      stationLayer = L.geoJSON(data, {
+        pointToLayer: (feature, latlng) => L.circleMarker(latlng, {
+          radius: 4, weight: 1, color: '#000', fillColor: 'red', fillOpacity: 0.85
+        }).bindPopup(feature.properties && feature.properties.name ? feature.properties.name : 'Station')
+      }).addTo(map);
+      const pts = data.features.filter(f => f.geometry && f.geometry.type === 'Point');
+      populateStationSelects(pts);
+      enableUI();
+      setStatus('Ready. Choose start and end, then Start.');
+    }).catch(err => {
+      console.error(err); setStatus('Failed to load railway_station.geojson');
+    });
+  </script>
+</body>
+</html>
