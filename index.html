@@ -97,20 +97,14 @@
 
     const toLatLng = (coord) => [coord[1], coord[0]]; // [lng, lat] -> [lat, lng]
 
-    // Optimized distance calculation with caching
-    const distanceCache = new Map();
+    // Simple distance calculation without caching to prevent memory issues
     function haversineKm(lat1, lon1, lat2, lon2) {
-      const cacheKey = `${lat1.toFixed(4)},${lon1.toFixed(4)},${lat2.toFixed(4)},${lon2.toFixed(4)}`;
-      if (distanceCache.has(cacheKey)) return distanceCache.get(cacheKey);
-      
       const R = 6371;
       const toRad = x => x * Math.PI / 180;
       const dLat = toRad(lat2 - lat1);
       const dLon = toRad(lon2 - lon1);
       const a = Math.sin(dLat/2)**2 + Math.cos(toRad(lat1))*Math.cos(toRad(lat2))*Math.sin(dLon/2)**2;
-      const result = 2 * R * Math.atan2(Math.sqrt(a), Math.sqrt(1 - a));
-      distanceCache.set(cacheKey, result);
-      return result;
+      return 2 * R * Math.atan2(Math.sqrt(a), Math.sqrt(1 - a));
     }
 
     function ensureNode(lat, lng) {
@@ -170,9 +164,9 @@
       const { key, distKm } = findNearestNode(lat, lng);
       if (key) {
         const n = graph.get(key);
-        // Log if snapping distance is very large (indicates potential issue)
-        if (distKm > 50) {
-          console.log(`Large snap distance: ${distKm.toFixed(1)}km from [${lat.toFixed(4)}, ${lng.toFixed(4)}] to railway`);
+        // Log only extremely large snapping distances
+        if (distKm > 100) {
+          console.warn(`Extreme snap distance: ${distKm.toFixed(1)}km - check data integrity`);
         }
         return { lat: n.lat, lng: n.lng };
       }
@@ -1250,10 +1244,10 @@
                   const snapped = snapToTrackStrict(pos[0], pos[1]);
                   pos = [snapped.lat, snapped.lng];
                   
-                  // Log large alignment corrections for debugging
+                  // Log only extreme alignment corrections to reduce console spam
                   const alignmentDist = haversineKm(originalPos[0], originalPos[1], pos[0], pos[1]);
-                  if (alignmentDist > 10) {
-                    console.log(`Train ${tr.id} aligned ${alignmentDist.toFixed(1)}km to railway`);
+                  if (alignmentDist > 50) {
+                    console.warn(`Train ${tr.id} aligned ${alignmentDist.toFixed(1)}km to railway - check route data`);
                   }
                 }
                 break;
@@ -1261,34 +1255,38 @@
               if (!pos) continue;
               activeTrains++;
               const id = String(tr.id);
-              realtimeSeenAt.set(id, Date.now());
-              let m = realtimeMarkerById.get(id);
-              if (!m) {
-                const icon = L.divIcon({ className: 'train-icon', html: '🚆', iconSize: [20,20] });
-                m = L.marker(pos, { icon });
-                m.bindTooltip(id, { permanent: true, direction: 'top', offset: [0, -10], className: 'train-label' });
-                m.setOpacity(showByZoom ? 1 : 0);
-                m.addTo(realtimeLayer);
-                realtimeMarkerById.set(id, m);
-              } else {
-                m.setLatLng(pos);
-                m.setOpacity(showByZoom ? 1 : 0);
-              }
-              if (showTrainMarkers && !map.hasLayer(realtimeLayer)) map.addLayer(realtimeLayer);
-              const tState = scheduledTrains.get(id);
-              if (tState && tState.marker) {
-                tState.externalControlled = true;
-                tState.externalUntil = Date.now() + 30000;
-                // Optimized DOM updates - only when visible and position changed
-                if (showTrainMarkers) {
-                  const currentPos = tState.marker.getLatLng();
-                  const posChanged = Math.abs(currentPos.lat - pos[0]) > 0.0001 || 
-                                    Math.abs(currentPos.lng - pos[1]) > 0.0001;
-                  if (posChanged) {
-                    tState.marker.setLatLng(pos);
-                    setMarkerVisible(tState.marker, showByZoom);
+              try {
+                realtimeSeenAt.set(id, Date.now());
+                let m = realtimeMarkerById.get(id);
+                if (!m) {
+                  const icon = L.divIcon({ className: 'train-icon', html: '🚆', iconSize: [20,20] });
+                  m = L.marker(pos, { icon });
+                  m.bindTooltip(id, { permanent: true, direction: 'top', offset: [0, -10], className: 'train-label' });
+                  m.setOpacity(showByZoom ? 1 : 0);
+                  m.addTo(realtimeLayer);
+                  realtimeMarkerById.set(id, m);
+                } else {
+                  m.setLatLng(pos);
+                  m.setOpacity(showByZoom ? 1 : 0);
+                }
+                if (showTrainMarkers && !map.hasLayer(realtimeLayer)) map.addLayer(realtimeLayer);
+                const tState = scheduledTrains.get(id);
+                if (tState && tState.marker) {
+                  tState.externalControlled = true;
+                  tState.externalUntil = Date.now() + 30000;
+                  // Optimized DOM updates - only when visible and position changed
+                  if (showTrainMarkers) {
+                    const currentPos = tState.marker.getLatLng();
+                    const posChanged = Math.abs(currentPos.lat - pos[0]) > 0.0001 || 
+                                      Math.abs(currentPos.lng - pos[1]) > 0.0001;
+                    if (posChanged) {
+                      tState.marker.setLatLng(pos);
+                      setMarkerVisible(tState.marker, showByZoom);
+                    }
                   }
                 }
+              } catch (error) {
+                console.warn(`Error updating train ${id}:`, error);
               }
             }
             
@@ -1297,8 +1295,20 @@
             tickCount++;
             if (tickCount % 30 === 0) { // Less frequent logging for better performance
               console.log(`Tick ${tickCount}: ${activeTrains}/${sampleSimRoutes.length} trains active, zoom: ${map.getZoom()}`);
-              // Clear distance cache to prevent memory buildup
-              if (distanceCache.size > 1000) distanceCache.clear();
+              // Clean up old markers to prevent memory issues
+              if (realtimeMarkerById.size > 100) {
+                const now = Date.now();
+                for (const [id, lastSeen] of realtimeSeenAt.entries()) {
+                  if (now - lastSeen > 60000) { // Remove markers not seen for 1 minute
+                    const marker = realtimeMarkerById.get(id);
+                    if (marker) {
+                      map.removeLayer(marker);
+                      realtimeMarkerById.delete(id);
+                    }
+                    realtimeSeenAt.delete(id);
+                  }
+                }
+              }
             }
           };
           tick();
