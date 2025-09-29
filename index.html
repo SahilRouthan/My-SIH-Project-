@@ -319,8 +319,8 @@
   }
 
     // Zoom-based visibility: show markers only when zoomed in enough
-    const markerVisibilityZoom = 6; // Lower zoom requirement to see trains sooner
-    const stationVisibilityZoom = 10; // Much higher zoom required to see stations (avoid clutter)
+    const markerVisibilityZoom = 7; // Higher zoom requirement to reduce load
+    const stationVisibilityZoom = 12; // Much higher zoom required to see stations (avoid clutter)
   // Visualization toggle: keep only station markers visible on map
       let showTrainMarkers = true; // default visible for main simulation
 
@@ -610,7 +610,10 @@
       const departMs = startNow ? 0 : parseDepartOffsetMs(entry.depart ?? entry.departAt ?? entry.departure ?? entry.departureTime ?? 0);
       const latlngObjs = routeObj.latlngs;
 
-      const line = L.polyline(latlngObjs, { color, weight: 3, opacity: 0.9 }).addTo(map);
+      // Only render polylines for fewer trains to improve performance
+      const line = trainRoutes.length < 50 ? 
+        L.polyline(latlngObjs, { color, weight: 2, opacity: 0.7 }).addTo(map) : 
+        null;
       const icon = L.divIcon({ className: 'train-icon', html: '🚆', iconSize: [22,22] });
   const marker = L.marker(latlngObjs[0], { icon });
   if (showTrainMarkers) marker.addTo(map);
@@ -884,7 +887,7 @@
     // Removed button event listeners - using map-only interface
     // Load railway tracks and build graph
     const railwayReady = fetch('Railways_indian.geojson').then(r => r.json()).then(data => {
-      railwayLayer = L.geoJSON(data, { style: { color: '#1e88e5', weight: 1 } }).addTo(map);
+      railwayLayer = L.geoJSON(data, { style: { color: '#1e88e5', weight: 0.5, opacity: 0.6 } }).addTo(map);
       const stats = buildGraphFromGeoJSON(data);
       setStatus(`Railway loaded: ${stats.nodeCount.toLocaleString()} nodes, ${stats.edgeCount.toLocaleString()} edges.`);
     }).catch(err => {
@@ -909,7 +912,7 @@
         if (!data || !Array.isArray(data.features)) throw new Error('bad geojson');
         if (stationLayer) { if (map.hasLayer(stationLayer)) map.removeLayer(stationLayer); stationLayer = null; }
         stationLayer = L.geoJSON(data, {
-          pointToLayer: (feature, latlng) => L.circleMarker(latlng, { radius: 3, weight: 1, color: '#666', fillColor: '#666', fillOpacity: 0.6, interactive: false })
+          pointToLayer: (feature, latlng) => L.circleMarker(latlng, { radius: 2, weight: 0.5, color: '#666', fillColor: '#666', fillOpacity: 0.4, interactive: false })
         });
         const pts = data.features.filter(f => f.geometry && f.geometry.type === 'Point');
         populateStationIndex(pts);
@@ -1125,7 +1128,7 @@
           console.log(`Found ${trains.length} trains in dataset`);
           sampleSimRoutes = [];
           const params = new URLSearchParams(window.location.search);
-          const sampleLimit = Number(params.get('sampleLimit') || 1000); // Increased default for primary source
+          const sampleLimit = Number(params.get('sampleLimit') || 75); // Reduced for better performance
           let added = 0;
           for (const tr of trains) {
             if (added >= sampleLimit) break;
@@ -1190,9 +1193,9 @@
                 const r = (tNow - tr.t0) / (tr.t1 - tr.t0);
                 const targetKm = r * tr.totalKm;
                 pos = posAlongPolyline(tr.coords, tr.cum, targetKm);
-                // Snap to nearest track node to keep trains on railway network
-                if (pos) {
-                  const snapped = snapLatLngToTrack(pos[0], pos[1], 5);
+                // Snap to nearest track (performance optimized - every 4th tick)
+                if (pos && tickCount % 4 === 0) {
+                  const snapped = snapLatLngToTrack(pos[0], pos[1], 3);
                   pos = [snapped.lat, snapped.lng];
                 }
                 break;
@@ -1218,20 +1221,23 @@
               if (tState && tState.marker) {
                 tState.externalControlled = true;
                 tState.externalUntil = Date.now() + 30000;
-                if (showTrainMarkers) tState.marker.setLatLng(pos);
-                if (showTrainMarkers) setMarkerVisible(tState.marker, showByZoom);
+                // Batch DOM updates for better performance - every other tick
+                if (tickCount % 2 === 0) {
+                  if (showTrainMarkers) tState.marker.setLatLng(pos);
+                  if (showTrainMarkers) setMarkerVisible(tState.marker, showByZoom);
+                }
               }
             }
             
-            // Debug output every 30 ticks (every 30 seconds with 1s interval)
+            // Debug output every 15 ticks (every 30 seconds with 2s interval)
             tickCount++;
-            if (tickCount % 30 === 0) {
+            if (tickCount % 15 === 0) {
               console.log(`Tick ${tickCount}: ${activeTrains}/${sampleSimRoutes.length} trains active, zoom: ${map.getZoom()}, showMarkers: ${showTrainMarkers}, showByZoom: ${showByZoom}`);
             }
           };
           tick();
           if (sampleSimInterval) clearInterval(sampleSimInterval);
-          sampleSimInterval = setInterval(tick, 1000); // Update every second for smooth real-time simulation
+          sampleSimInterval = setInterval(tick, 2000); // Update every 2 seconds for better performance
           setStatus(`Main train simulation active from ${file} for ${sampleSimRoutes.length} trains using route coordinates. Routes available for manual routing.`);
         })
         .catch((err) => {
