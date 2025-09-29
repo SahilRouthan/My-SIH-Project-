@@ -1244,16 +1244,31 @@
     Promise.all([railwayReady, stationsReady]).then(() => {
       updateVisibilityForZoom();
       
-      // Load optimized trains for fast loading and continuous 24/7 simulation
-      fetch('optimized_trains.json')
+      // Load MINIMAL trains for lightning-fast loading and continuous 24/7 simulation
+      fetch('minimal_trains.json')
         .then(r => r.ok ? r.text() : Promise.reject(`HTTP ${r.status}`))
         .then(text => {
-          console.log('Loading optimized trains for fast 24/7 simulation (310 schedules, 0.7MB)');
-          return startSampleRoutesRealtime('optimized_trains.json');
+          console.log('Loading MINIMAL trains for lightning-fast 24/7 simulation (150 schedules, 195KB)');
+          return startSampleRoutesRealtime('minimal_trains.json');
         })
         .catch((err) => {
-          console.error('Failed to load optimized_trains.json:', err);
-          setStatus('Failed to load optimized train data. Please ensure optimized_trains.json exists.');
+          console.error('Failed to load minimal_trains.json, falling back to ultra-optimized:', err);
+          // Fallback cascade: minimal → ultra → optimized
+          return fetch('ultra_optimized_trains.json')
+            .then(r => r.ok ? r.text() : Promise.reject(`HTTP ${r.status}`))
+            .then(text => {
+              console.log('Loading fallback ultra-optimized trains (200 schedules, 305KB)');
+              return startSampleRoutesRealtime('ultra_optimized_trains.json');
+            })
+            .catch((err2) => {
+              console.error('Failed to load ultra_optimized_trains.json, final fallback to optimized_trains.json:', err2);
+              return fetch('optimized_trains.json')
+                .then(r => r.ok ? r.text() : Promise.reject(`HTTP ${r.status}`))
+                .then(text => {
+                  console.log('Loading final fallback optimized trains (310 schedules, 0.7MB)');
+                  return startSampleRoutesRealtime('optimized_trains.json');
+                });
+            });
         });
       
       // Apply initial train marker visibility according to UI toggle
