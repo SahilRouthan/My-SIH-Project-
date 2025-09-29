@@ -150,26 +150,35 @@
       return { key: bestKey, distKm: bestDist };
     }
 
-    // Snap a lat/lng to nearest graph node within a threshold (km); if none within threshold, return original
+    // Snap a lat/lng to nearest graph node - ALWAYS snap to keep trains on tracks
     function snapLatLngToTrack(lat, lng, maxKm = 2) {
       if (!nodeKeys.length) return { lat, lng };
       const { key, distKm } = findNearestNode(lat, lng);
-      if (!key || distKm == null || distKm > maxKm) return { lat, lng };
+      if (!key) return { lat, lng };
       const n = graph.get(key);
       return { lat: n.lat, lng: n.lng };
     }
 
-    // Enhanced snapping for better track alignment
+    // Enhanced snapping for better track alignment - ALWAYS find a track
     function snapToTrackStrict(lat, lng) {
-      const result = snapLatLngToTrack(lat, lng, 8); // Larger search radius
-      // If still far from track, try a more aggressive search
-      if (!nodeKeys.length) return { lat, lng };
-      const { distKm } = findNearestNode(result.lat, result.lng);
-      if (distKm > 1) {
-        // Try finding nearest track with larger radius
-        return snapLatLngToTrack(lat, lng, 15);
+      if (!nodeKeys.length) {
+        console.warn("No railway nodes loaded for snapping!");
+        return { lat, lng };
       }
-      return result;
+      
+      // Always find the nearest railway point regardless of distance
+      const { key, distKm } = findNearestNode(lat, lng);
+      if (key) {
+        const n = graph.get(key);
+        // Log if snapping distance is very large (indicates potential issue)
+        if (distKm > 50) {
+          console.log(`Large snap distance: ${distKm.toFixed(1)}km from [${lat.toFixed(4)}, ${lng.toFixed(4)}] to railway`);
+        }
+        return { lat: n.lat, lng: n.lng };
+      }
+      
+      console.warn("Failed to find nearest railway node!");
+      return { lat, lng };
     }
 
     // Min-heap priority queue for Dijkstra
@@ -915,6 +924,7 @@
       railwayLayer = L.geoJSON(data, { style: { color: '#1e88e5', weight: 0.5, opacity: 0.6 } }).addTo(map);
       const stats = buildGraphFromGeoJSON(data);
       setStatus(`Railway loaded: ${stats.nodeCount.toLocaleString()} nodes, ${stats.edgeCount.toLocaleString()} edges.`);
+      console.log(`Railway network ready: ${nodeKeys.length} nodes available for snapping`);
     }).catch(err => {
       console.error(err); setStatus('Failed to load Railways_indian.geojson');
     });
@@ -1234,11 +1244,17 @@
                 const r = (tNow - tr.t0) / (tr.t1 - tr.t0);
                 const targetKm = r * tr.totalKm;
                 pos = posAlongPolyline(tr.coords, tr.cum, targetKm);
-                // Optimized snapping - less frequent for better performance
-                if (pos && (tickCount % 3 === 0 || tr.needsRealign)) {
+                // ALWAYS snap to track - no exceptions to prevent off-track trains
+                if (pos) {
+                  const originalPos = [pos[0], pos[1]];
                   const snapped = snapToTrackStrict(pos[0], pos[1]);
                   pos = [snapped.lat, snapped.lng];
-                  tr.needsRealign = false;
+                  
+                  // Log large alignment corrections for debugging
+                  const alignmentDist = haversineKm(originalPos[0], originalPos[1], pos[0], pos[1]);
+                  if (alignmentDist > 10) {
+                    console.log(`Train ${tr.id} aligned ${alignmentDist.toFixed(1)}km to railway`);
+                  }
                 }
                 break;
               }
