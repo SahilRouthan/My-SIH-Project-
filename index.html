@@ -176,25 +176,29 @@
       return { lat: n.lat, lng: n.lng };
     }
 
-    // Enhanced snapping for better track alignment - ALWAYS find a track
+    // ULTRA-AGGRESSIVE track snapping - NEVER allow off-track trains
     function snapToTrackStrict(lat, lng) {
-      if (!nodeKeys.length) {
-        console.warn("No railway nodes loaded for snapping!");
-        return { lat, lng };
+      if (!nodeKeys.length) return { lat, lng };
+      
+      // Find nearest railway node with NO distance limit
+      let bestKey = null;
+      let minDist = Infinity;
+      
+      // Check multiple nearby nodes for best alignment
+      for (const key of nodeKeys) {
+        const node = graph.get(key);
+        const dist = haversineKm(lat, lng, node.lat, node.lng);
+        if (dist < minDist) {
+          minDist = dist;
+          bestKey = key;
+        }
       }
       
-      // Always find the nearest railway point regardless of distance
-      const { key, distKm } = findNearestNode(lat, lng);
-      if (key) {
-        const n = graph.get(key);
-        // Log only extremely large snapping distances
-        if (distKm > 100) {
-          console.warn(`Extreme snap distance: ${distKm.toFixed(1)}km - check data integrity`);
-        }
+      if (bestKey) {
+        const n = graph.get(bestKey);
         return { lat: n.lat, lng: n.lng };
       }
       
-      console.warn("Failed to find nearest railway node!");
       return { lat, lng };
     }
 
@@ -1281,8 +1285,8 @@
                 const r = (tNow - tr.t0) / (tr.t1 - tr.t0);
                 const targetKm = r * tr.totalKm;
                 pos = posAlongPolyline(tr.coords, tr.cum, targetKm);
-                // Ultra-optimized snapping - every 3rd frame for maximum performance
-                if (pos && tickCount % 3 === 0) { // Reduced snapping frequency for speed
+                // FORCE TRACK ALIGNMENT - every frame, no exceptions
+                if (pos) {
                   const snapped = snapToTrackStrict(pos[0], pos[1]);
                   pos = [snapped.lat, snapped.lng];
                 }
@@ -1294,16 +1298,20 @@
               try {
                 realtimeSeenAt.set(id, Date.now());
                 let m = realtimeMarkerById.get(id);
+                // Ensure position is ALWAYS on track before creating/updating marker
+                const trackPos = snapToTrackStrict(pos[0], pos[1]);
+                const finalPos = [trackPos.lat, trackPos.lng];
+                
                 if (!m) {
                   const icon = L.divIcon({ className: 'train-icon', html: '🚆', iconSize: [20,20] });
-                  m = getPooledMarker(pos, icon);
+                  m = getPooledMarker(finalPos, icon);
                   m.bindTooltip(id, { permanent: true, direction: 'top', offset: [0, -10], className: 'train-label' });
                   m.setOpacity(showByZoom ? 1 : 0);
                   m.addTo(realtimeLayer);
                   realtimeMarkerById.set(id, m);
                 } else {
-                  // Fast position update for smooth train movement
-                  m.setLatLng(pos);
+                  // Force track-aligned position update
+                  m.setLatLng(finalPos);
                   m.setOpacity(showByZoom ? 1 : 0);
                 }
                 if (showTrainMarkers && !map.hasLayer(realtimeLayer)) map.addLayer(realtimeLayer);
@@ -1311,15 +1319,28 @@
                 if (tState && tState.marker) {
                   tState.externalControlled = true;
                   tState.externalUntil = Date.now() + 30000;
-                  // Fast DOM updates - update every frame for smooth movement
+                  // Force track-aligned updates for scheduled trains
                   if (showTrainMarkers) {
-                    tState.marker.setLatLng(pos);
+                    const alignedPos = snapToTrackStrict(pos[0], pos[1]);
+                    tState.marker.setLatLng([alignedPos.lat, alignedPos.lng]);
                     setMarkerVisible(tState.marker, showByZoom);
                   }
                 }
               } catch (error) {
                 console.warn(`Error updating train ${id}:`, error);
               }
+            }
+            
+            // FORCE all markers to stay on tracks (verification sweep)
+            if (tickCount % 10 === 0) { // Every 10 frames, force align all markers
+              realtimeMarkerById.forEach((marker, id) => {
+                const currentPos = marker.getLatLng();
+                const aligned = snapToTrackStrict(currentPos.lat, currentPos.lng);
+                const dist = haversineKm(currentPos.lat, currentPos.lng, aligned.lat, aligned.lng);
+                if (dist > 0.1) { // If more than 100m off track, force realign
+                  marker.setLatLng([aligned.lat, aligned.lng]);
+                }
+              });
             }
             
             // Update performance metrics and debug output
