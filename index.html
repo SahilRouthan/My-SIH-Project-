@@ -1244,20 +1244,20 @@
     Promise.all([railwayReady, stationsReady]).then(() => {
       updateVisibilityForZoom();
       
-      // Load MINIMAL trains for lightning-fast loading and continuous 24/7 simulation
-      fetch('minimal_trains.json')
+      // Load RAILWAY-ALIGNED ultra-optimized trains for realistic simulation
+      fetch('ultra_optimized_trains.json')
         .then(r => r.ok ? r.text() : Promise.reject(`HTTP ${r.status}`))
         .then(text => {
-          console.log('Loading MINIMAL trains for lightning-fast 24/7 simulation (150 schedules, 195KB)');
-          return startSampleRoutesRealtime('minimal_trains.json');
+          console.log('Loading RAILWAY-ALIGNED ultra-optimized trains (200 schedules, 318KB) - Trains follow actual tracks!');
+          return startSampleRoutesRealtime('ultra_optimized_trains.json');
         })
         .catch((err) => {
-          console.error('Failed to load minimal_trains.json, falling back to ultra-optimized:', err);
-          // Fallback cascade: minimal → ultra → optimized
-          return fetch('ultra_optimized_trains.json')
+          console.error('Failed to load ultra_optimized_trains.json, falling back to minimal:', err);
+          // Fallback cascade: ultra → minimal → optimized
+          return fetch('minimal_trains.json')
             .then(r => r.ok ? r.text() : Promise.reject(`HTTP ${r.status}`))
             .then(text => {
-              console.log('Loading fallback ultra-optimized trains (200 schedules, 305KB)');
+              console.log('Loading fallback minimal trains (150 schedules, 195KB)');
               return startSampleRoutesRealtime('ultra_optimized_trains.json');
             })
             .catch((err2) => {
