@@ -11,31 +11,60 @@
       /* Hardware acceleration for ultra-smooth zooming */
       transform: translateZ(0);
       -webkit-transform: translateZ(0);
-      will-change: transform, opacity;
+      will-change: transform;
       backface-visibility: hidden;
       -webkit-backface-visibility: hidden;
-      /* Instant zoom response optimizations */
-      image-rendering: -webkit-optimize-contrast;
-      image-rendering: crisp-edges;
-      contain: layout style paint;
     }
-    .controls {
+    /* Zoom Controls */
+    .zoom-controls {
       position: absolute;
       z-index: 1000;
       top: 10px;
-      left: 10px;
-      background: rgba(255,255,255,0.95);
-      padding: 10px;
-      border-radius: 6px;
-      box-shadow: 0 2px 10px rgba(0,0,0,0.15);
+      right: 10px;
       display: flex;
-      gap: 8px;
-      align-items: center;
-      flex-wrap: wrap;
+      flex-direction: column;
+      gap: 2px;
     }
-    .controls select, .controls button {
-      font-size: 14px;
-      padding: 6px 8px;
+    
+    .zoom-btn {
+      width: 40px;
+      height: 40px;
+      background: rgba(255, 255, 255, 0.95);
+      border: 1px solid rgba(0, 0, 0, 0.1);
+      border-radius: 4px;
+      cursor: pointer;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      font-size: 18px;
+      font-weight: bold;
+      color: #333;
+      box-shadow: 0 2px 6px rgba(0, 0, 0, 0.15);
+      transition: all 0.2s ease;
+      user-select: none;
+    }
+    
+    .zoom-btn:hover {
+      background: rgba(255, 255, 255, 1);
+      box-shadow: 0 4px 12px rgba(0, 0, 0, 0.2);
+      transform: translateY(-1px);
+    }
+    
+    .zoom-btn:active {
+      transform: translateY(0);
+      box-shadow: 0 2px 4px rgba(0, 0, 0, 0.15);
+    }
+    
+    .zoom-btn:first-child {
+      border-bottom: none;
+      border-bottom-left-radius: 0;
+      border-bottom-right-radius: 0;
+    }
+    
+    .zoom-btn:last-child {
+      border-top: none;
+      border-top-left-radius: 0;
+      border-top-right-radius: 0;
     }
     .status {
       position: absolute;
@@ -51,39 +80,33 @@
       max-width: 50ch;
     }
     .train-icon { 
-      font-size: 18px; 
+      font-size: 16px; 
       transition: transform 0.1s cubic-bezier(0.4, 0, 0.2, 1);
       will-change: transform;
-      filter: drop-shadow(0 1px 2px rgba(0,0,0,0.1));
+      filter: drop-shadow(0 1px 3px rgba(0,0,0,0.2));
       transform-origin: center center;
+      color: #FF4444;
+      font-weight: bold;
+      text-shadow: 0 0 2px rgba(255, 68, 68, 0.5);
     }
     
-    /* Instant tile loading for zero zoom lag */
+    /* Smooth tile transitions during zoom */
     .leaflet-tile {
-      transition: opacity 0.1s ease-out;
-      image-rendering: -webkit-optimize-contrast;
-      will-change: transform, opacity;
+      transition: opacity 0.2s ease-in-out;
     }
     
     .leaflet-tile-container {
       transform: translateZ(0);
-      will-change: transform;
     }
     
-    /* Instant zoom response */
+    /* Smooth zoom animations */
     .leaflet-zoom-animated {
-      transition: transform 0.15s cubic-bezier(0.4, 0, 0.2, 1);
-    }
-    
-    /* Preload optimization */
-    .leaflet-tile-pane {
-      will-change: transform;
-      contain: layout style paint;
+      transition: transform 0.25s cubic-bezier(0.25, 0.46, 0.45, 0.94);
     }
     .legend {
       position: absolute;
       z-index: 1000;
-      top: 10px;
+      top: 100px;
       right: 10px;
       background: rgba(255,255,255,0.95);
       padding: 8px 10px;
@@ -96,17 +119,102 @@
     }
     .legend .item { display: flex; align-items: center; gap: 6px; margin: 2px 0; }
     .legend .swatch { width: 12px; height: 12px; border-radius: 2px; border: 1px solid #0002; }
+    
+    /* Loading Spinner Styles */
+    .loading-overlay {
+      position: fixed;
+      top: 0;
+      left: 0;
+      width: 100%;
+      height: 100%;
+      background: rgba(0, 0, 0, 0.7);
+      display: flex;
+      justify-content: center;
+      align-items: center;
+      z-index: 10000;
+      backdrop-filter: blur(2px);
+    }
+    
+    .loading-container {
+      background: rgba(255, 255, 255, 0.95);
+      padding: 30px;
+      border-radius: 12px;
+      box-shadow: 0 8px 32px rgba(0, 0, 0, 0.3);
+      text-align: center;
+      min-width: 300px;
+    }
+    
+    .spinner {
+      width: 50px;
+      height: 50px;
+      border: 4px solid #f3f3f3;
+      border-top: 4px solid #2196F3;
+      border-radius: 50%;
+      animation: spin 1s linear infinite;
+      margin: 0 auto 20px auto;
+    }
+    
+    @keyframes spin {
+      0% { transform: rotate(0deg); }
+      100% { transform: rotate(360deg); }
+    }
+    
+    .loading-text {
+      color: #333;
+      font-family: system-ui, Arial, sans-serif;
+      font-size: 16px;
+      font-weight: 500;
+      margin-bottom: 10px;
+    }
+    
+    .loading-details {
+      color: #666;
+      font-family: system-ui, Arial, sans-serif;
+      font-size: 14px;
+      line-height: 1.4;
+    }
+    
+    .progress-bar {
+      width: 100%;
+      height: 6px;
+      background: #e0e0e0;
+      border-radius: 3px;
+      margin: 15px 0;
+      overflow: hidden;
+    }
+    
+    .progress-fill {
+      height: 100%;
+      background: linear-gradient(90deg, #2196F3, #21CBF3);
+      border-radius: 3px;
+      transition: width 0.3s ease;
+      width: 0%;
+    }
   </style>
 </head>
 <body>
-  <!-- Simple toggle for train visibility -->
-  <div class="controls">
-    <label style="display:flex; align-items:center; gap:6px;">
-      <input id="toggleTrains" type="checkbox" checked />
-      <span>Show trains</span>
-    </label>
+  <!-- Loading Overlay -->
+  <div id="loadingOverlay" class="loading-overlay">
+    <div class="loading-container">
+      <div class="spinner"></div>
+      <div class="loading-text" id="loadingText">Initializing Railway Network...</div>
+      <div class="progress-bar">
+        <div class="progress-fill" id="progressFill"></div>
+      </div>
+      <div class="loading-details" id="loadingDetails">
+        Preparing to load railway data and train schedules
+      </div>
+    </div>
   </div>
+
   <div id="map"></div>
+  
+  <!-- Zoom Controls -->
+  <div class="zoom-controls">
+    <div class="zoom-btn" id="zoomIn" title="Zoom In">+</div>
+    <div class="zoom-btn" id="zoomOut" title="Zoom Out">−</div>
+  </div>
+  
   <div class="status" id="status">Loading railway network…</div>
   <div id="performance" style="position: absolute; top: 60px; left: 10px; background: rgba(0,0,0,0.7); color: white; padding: 8px; border-radius: 4px; font-size: 12px; z-index: 1000;">
     <div>FPS: <span id="fps">--</span></div>
@@ -118,34 +226,31 @@
   </div>
 
   <script>
-    // Preload tiles for instant zoom response
-    const tileCache = new Map();
-    
-    // Initialize map with instant zoom response
+    // Initialize map with smooth zoom options - focused on India
     const map = L.map('map', {
       zoomAnimation: true,
       fadeAnimation: true,
       markerZoomAnimation: true,
-      zoomSnap: 0.1, // Even finer zoom increments for instant response
-      zoomDelta: 0.25, // Smaller zoom steps for smoother feel
-      wheelPxPerZoomLevel: 40, // More responsive mouse wheel
-      wheelDebounceTime: 40, // Faster wheel response
-      bounceAtZoomLimits: false, // No bounce delay at zoom limits
+      zoomSnap: 0.25, // Smoother zoom increments
+      zoomDelta: 0.5, // Finer zoom control
+      wheelPxPerZoomLevel: 80, // Smoother mouse wheel zooming
       preferCanvas: true, // Better performance for many markers
-      renderer: L.canvas({ padding: 0.5 }) // Canvas renderer for instant updates
-    }).setView([22.8, 79.5], 5);
+      // Restrict view to India bounds
+      maxBounds: [[6.5, 68.0], [37.5, 97.5]], // India geographical bounds
+      maxBoundsViscosity: 1.0 // Keep within bounds
+    }).setView([20.5937, 78.9629], 5.5); // Center of India with better zoom
     
     L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
       attribution: '© OpenStreetMap contributors',
       updateWhenIdle: false, // Update tiles during zoom for smoother experience
-      keepBuffer: 8, // Keep even more tiles in memory
-      updateWhenZooming: true, // Immediate tile updates during zoom
-      updateInterval: 50, // Faster tile update interval
-      maxZoom: 18,
-      minZoom: 3,
-      detectRetina: true, // Better tile quality
-      crossOrigin: true
+      keepBuffer: 4, // Keep more tiles in memory for smoother panning/zooming
+      minZoom: 4, // Minimum zoom to keep India in view
+      maxZoom: 18 // Maximum zoom for detailed view
     }).addTo(map);
+    
+    // Set zoom limits on the map itself
+    map.setMinZoom(4);
+    map.setMaxZoom(18);
 
   // Layers and global state
     let railwayLayer = null;
@@ -410,6 +515,67 @@
 
     // UI elements (simplified - only status and train toggle remain)
     const statusEl = document.getElementById('status');
+    
+    // Loading overlay control functions
+    const loadingOverlay = document.getElementById('loadingOverlay');
+    const loadingText = document.getElementById('loadingText');
+    const loadingDetails = document.getElementById('loadingDetails');
+    const progressFill = document.getElementById('progressFill');
+    
+    let loadingSteps = [];
+    let currentStep = 0;
+    
+    function initializeLoadingSteps() {
+      loadingSteps = [
+        { text: "Loading Railway Network...", details: "Fetching Railways_indian.geojson (~2MB)", progress: 20 },
+        { text: "Building Railway Graph...", details: "Processing railway nodes and connections", progress: 40 },
+        { text: "Loading Station Data...", details: "Fetching station coordinates and names", progress: 60 },
+        { text: "Loading Train Schedules...", details: "Fetching ultra-optimized train data", progress: 80 },
+        { text: "Starting Train Simulation...", details: "Initializing real-time train movements", progress: 95 },
+        { text: "Ready!", details: "Railway system fully operational", progress: 100 }
+      ];
+    }
+    
+    function updateLoadingStep(stepIndex, customText = null, customDetails = null) {
+      if (stepIndex >= loadingSteps.length) return;
+      
+      currentStep = stepIndex;
+      const step = loadingSteps[stepIndex];
+      
+      loadingText.textContent = customText || step.text;
+      loadingDetails.textContent = customDetails || step.details;
+      progressFill.style.width = step.progress + '%';
+      
+      console.log(`Loading Step ${stepIndex + 1}/${loadingSteps.length}: ${step.text}`);
+    }
+    
+    function hideLoadingOverlay() {
+      setTimeout(() => {
+        loadingOverlay.style.opacity = '0';
+        setTimeout(() => {
+          loadingOverlay.style.display = 'none';
+        }, 500);
+      }, 1000); // Show "Ready!" for 1 second before hiding
+    }
+    
+    function showLoadingError(errorMessage) {
+      loadingText.textContent = "Loading Failed";
+      loadingDetails.textContent = errorMessage;
+      progressFill.style.background = '#f44336';
+      
+      // Add retry option
+      setTimeout(() => {
+        if (confirm("Failed to load railway data. Would you like to retry?")) {
+          location.reload();
+        } else {
+          hideLoadingOverlay();
+        }
+      }, 2000);
+    }
+    
+    // Initialize loading steps
+    initializeLoadingSteps();
+    updateLoadingStep(0);
 
   // Removed manual train animation - using optimized simulation only
 
@@ -439,8 +605,8 @@
     // Zoom-based visibility: show markers only when zoomed in enough
     const markerVisibilityZoom = 4; // Visible from default zoom for better simulation
     const stationVisibilityZoom = 12; // Much higher zoom required to see stations (avoid clutter)
-  // Visualization toggle: keep only station markers visible on map
-      let showTrainMarkers = true; // default visible for main simulation
+  // Train markers always visible (toggle removed)
+      let showTrainMarkers = true; // always visible for main simulation
 
       function applyTrainMarkerVisibility() {
         // Scheduled trains
@@ -491,8 +657,8 @@
       const showTrains = currentZoom >= markerVisibilityZoom;
       const showStations = currentZoom >= stationVisibilityZoom;
       
-      // More responsive zoom change detection
-      if (Math.abs(currentZoom - lastZoomLevel) < 0.05) return;
+      // Skip if zoom level hasn't meaningfully changed
+      if (Math.abs(currentZoom - lastZoomLevel) < 0.1) return;
       lastZoomLevel = currentZoom;
       
       // Use requestAnimationFrame for smooth updates
@@ -522,13 +688,11 @@
       });
     }
 
-    // Instant zoom handler with zero delay
+    // Ultra-smooth zoom handler with intelligent throttling
     function throttledZoomHandler() {
       isZooming = true;
       clearTimeout(zoomTimeout);
-      // Immediate response for instant zoom feel
-      requestAnimationFrame(updateVisibilityForZoom);
-      zoomTimeout = setTimeout(updateVisibilityForZoom, 8); // Double the responsiveness
+      zoomTimeout = setTimeout(updateVisibilityForZoom, 16); // ~60fps throttling
     }
     
     // Separate handler for zoom end to ensure final state is correct
@@ -549,13 +713,19 @@
     map.on('zoomstart', zoomStartHandler); // Detect zoom start
     map.on('zoom', throttledZoomHandler); // Smooth updates during zoom
     map.on('zoomend', zoomEndHandler); // Final accurate update
-    const toggleTrainsEl = document.getElementById('toggleTrains');
-    if (toggleTrainsEl) {
-      toggleTrainsEl.checked = showTrainMarkers;
-      toggleTrainsEl.addEventListener('change', () => {
-        showTrainMarkers = !!toggleTrainsEl.checked;
-        applyTrainMarkerVisibility();
-        console.log(`Train markers ${showTrainMarkers ? 'enabled' : 'disabled'}`);
+    // Zoom control functionality
+    const zoomInBtn = document.getElementById('zoomIn');
+    const zoomOutBtn = document.getElementById('zoomOut');
+    
+    if (zoomInBtn) {
+      zoomInBtn.addEventListener('click', () => {
+        map.zoomIn();
+      });
+    }
+    
+    if (zoomOutBtn) {
+      zoomOutBtn.addEventListener('click', () => {
+        map.zoomOut();
       });
     }
 
@@ -789,7 +959,7 @@
       const line = shouldShowLine ? 
         L.polyline(latlngObjs, { color, weight: 1.5, opacity: 0.6 }).addTo(map) : 
         null;
-      const icon = L.divIcon({ className: 'train-icon', html: '🚆', iconSize: [22,22] });
+      const icon = L.divIcon({ className: 'train-icon', html: '▲', iconSize: [22,22] });
   const marker = L.marker(latlngObjs[0], { icon });
   if (showTrainMarkers) marker.addTo(map);
       marker.bindTooltip(String(id), { permanent: true, direction: 'top', offset: [0, -10], className: 'train-label' });
@@ -1061,14 +1231,29 @@
 
     // Removed button event listeners - using map-only interface
     // Load railway tracks and build graph
-    const railwayReady = fetch('Railways_indian.geojson').then(r => r.json()).then(data => {
-      railwayLayer = L.geoJSON(data, { style: { color: '#2196F3', weight: 1.5, opacity: 0.9 } }).addTo(map);
-      const stats = buildGraphFromGeoJSON(data);
-      setStatus(`Railway loaded: ${stats.nodeCount.toLocaleString()} nodes, ${stats.edgeCount.toLocaleString()} edges.`);
-      console.log(`Railway network ready: ${nodeKeys.length} nodes available for snapping`);
-    }).catch(err => {
-      console.error(err); setStatus('Failed to load Railways_indian.geojson');
-    });
+    const railwayReady = fetch('Railways_indian.geojson')
+      .then(r => {
+        if (!r.ok) throw new Error(`HTTP ${r.status}: ${r.statusText}`);
+        const contentLength = r.headers.get('content-length');
+        const sizeText = contentLength ? `${(contentLength / 1024 / 1024).toFixed(1)}MB` : 'large file';
+        updateLoadingStep(0, "Loading Railway Network...", `Downloading ${sizeText} railway data...`);
+        return r.json();
+      })
+      .then(data => {
+        updateLoadingStep(1, "Building Railway Graph...", `Processing ${data.features?.length || 0} railway features...`);
+        
+        railwayLayer = L.geoJSON(data, { style: { color: '#2196F3', weight: 1.5, opacity: 0.9 } }).addTo(map);
+        const stats = buildGraphFromGeoJSON(data);
+        
+        updateLoadingStep(1, "Railway Graph Built", `${stats.nodeCount.toLocaleString()} nodes, ${stats.edgeCount.toLocaleString()} edges created`);
+        setStatus(`Railway loaded: ${stats.nodeCount.toLocaleString()} nodes, ${stats.edgeCount.toLocaleString()} edges.`);
+        console.log(`Railway network ready: ${nodeKeys.length} nodes available for snapping`);
+      })
+      .catch(err => {
+        console.error(err);
+        showLoadingError(`Failed to load railway network: ${err.message}`);
+        setStatus('Failed to load Railways_indian.geojson');
+      });
 
     // Load stations and populate selects + map (supports GeoJSON and JSON array formats)
     function toNumber(v) { const n = Number(v); return isFinite(n) ? n : null; }
@@ -1084,31 +1269,51 @@
       return { type: 'FeatureCollection', features: feats };
     }
     function loadStationsFromGeoJSON(url) {
-      return fetch(url).then(r => { if (!r.ok) throw new Error('not found'); return r.json(); }).then(data => {
+      return fetch(url).then(r => { 
+        if (!r.ok) throw new Error('not found'); 
+        updateLoadingStep(2, "Loading Station Data...", `Fetching stations from ${url}...`);
+        return r.json(); 
+      }).then(data => {
         if (!data || !Array.isArray(data.features)) throw new Error('bad geojson');
+        
+        updateLoadingStep(2, "Processing Stations...", `Loading ${data.features.length} station features...`);
+        
         if (stationLayer) { if (map.hasLayer(stationLayer)) map.removeLayer(stationLayer); stationLayer = null; }
         stationLayer = L.geoJSON(data, {
           pointToLayer: (feature, latlng) => L.circleMarker(latlng, { radius: 2, weight: 0.5, color: '#666', fillColor: '#666', fillOpacity: 0.4, interactive: false })
         });
         const pts = data.features.filter(f => f.geometry && f.geometry.type === 'Point');
         populateStationIndex(pts);
+        
+        updateLoadingStep(2, "Stations Loaded", `${pts.length} stations indexed successfully`);
         setStatus('Map ready with railway network and train simulation.');
         updateVisibilityForZoom();
         return true;
       });
     }
     function loadStationsFromJson(url) {
-      return fetch(url).then(r => { if (!r.ok) throw new Error('not found'); return r.text(); }).then(text => {
+      return fetch(url).then(r => { 
+        if (!r.ok) throw new Error('not found'); 
+        updateLoadingStep(2, "Loading Station Data...", `Fetching stations from ${url}...`);
+        return r.text(); 
+      }).then(text => {
+        updateLoadingStep(2, "Processing Station JSON...", "Parsing station data...");
+        
         const json = parseJsonLoose(text);
         const arr = Array.isArray(json) ? json : (Array.isArray(json.data) ? json.data : []);
         if (!Array.isArray(arr) || arr.length === 0) throw new Error('empty');
         const fc = makeFeaturesFromArray(arr);
         if (!fc.features.length) throw new Error('no points');
+        
+        updateLoadingStep(2, "Building Station Layer...", `Creating map layer for ${fc.features.length} stations...`);
+        
         if (stationLayer) { if (map.hasLayer(stationLayer)) map.removeLayer(stationLayer); stationLayer = null; }
         stationLayer = L.geoJSON(fc, {
           pointToLayer: (feature, latlng) => L.circleMarker(latlng, { radius: 3, weight: 1, color: '#666', fillColor: '#666', fillOpacity: 0.6, interactive: false })
         });
         populateStationIndex(fc.features);
+        
+        updateLoadingStep(2, "Stations Ready", `${fc.features.length} stations loaded and indexed`);
         setStatus('Map ready with railway network and train simulation.');
         updateVisibilityForZoom();
         return true;
@@ -1161,7 +1366,7 @@
         realtimeSeenAt.set(id, Date.now());
         let m = realtimeMarkerById.get(id);
         if (!m) {
-          const icon = L.divIcon({ className: 'train-icon', html: '🚆', iconSize: [20,20] });
+          const icon = L.divIcon({ className: 'train-icon', html: '▲', iconSize: [20,20] });
           m = L.marker([lat, lng], { icon });
           m.bindTooltip(id, { permanent: true, direction: 'top', offset: [0, -10], className: 'train-label' });
           m.setOpacity(showByZoom ? 1 : 0);
@@ -1359,14 +1564,11 @@
           let lastFPSTime = performance.now();
           const speedMultiplier = 1.5; // Balanced speed for optimal performance
           
-          // Optimized performance monitoring with zoom awareness
+          // Optimized performance monitoring
           function updatePerformance(activeTrains) {
             frameCount++;
             const now = performance.now();
-            // Skip performance monitoring during zoom for instant response
-            if (isZooming) return;
-            
-            if (now - lastFPSTime >= 2000) { // Even less frequent updates during normal operation
+            if (now - lastFPSTime >= 1500) { // Less frequent updates for better performance
               const fps = Math.round((frameCount * 1000) / (now - lastFPSTime));
               document.getElementById('fps').textContent = fps;
               document.getElementById('trainCount').textContent = activeTrains;
@@ -1392,10 +1594,10 @@
           let smoothingEnabled = true;
           
           const tick = () => {
-            // Instant zoom performance - minimal frame skipping
+            // Zoom-aware performance adaptation for ultra-smooth zooming
             if (isZooming) {
-              // Keep train animations but reduce frequency slightly for instant zoom response
-              if (skipFrames++ % 2 !== 0) return;
+              // Reduce train animation frequency during zoom for smoother map movement
+              if (skipFrames++ % 3 !== 0) return;
             } else {
               // Normal performance adaptation when not zooming
               if (performanceLevel === 'medium' && skipFrames++ % 2 === 1) return;
@@ -1466,7 +1668,7 @@
                 trainPositions.set(id, { pos: finalPos, rotation });
                 
                 if (!m) {
-                  const rotateHtml = `<div style="transform: rotate(${rotation}deg);">🚆</div>`;
+                  const rotateHtml = `<div style="transform: rotate(${rotation}deg);">▲</div>`;
                   const icon = L.divIcon({ className: 'train-icon', html: rotateHtml, iconSize: [18,18] });
                   m = getPooledMarker(finalPos, icon);
                   m.bindTooltip(id, { permanent: false, direction: 'top', offset: [0, -8], className: 'train-label' });
@@ -1476,7 +1678,7 @@
                 } else {
                   // Google Maps-style smooth position and rotation updates
                   m.setLatLng(finalPos);
-                  const rotateHtml = `<div style="transform: rotate(${rotation}deg);">🚆</div>`;
+                  const rotateHtml = `<div style="transform: rotate(${rotation}deg);">▲</div>`;
                   m.setIcon(L.divIcon({ className: 'train-icon', html: rotateHtml, iconSize: [18,18] }));
                   m.setOpacity(showByZoom ? 1 : 0);
                 }
@@ -1551,46 +1753,84 @@
           }
           smoothTick();
           setStatus(`Main train simulation active from ${file} for ${sampleSimRoutes.length} trains using route coordinates. Routes available for manual routing.`);
+          
+          // Signal that train simulation is ready
+          setTimeout(() => {
+            updateLoadingStep(5, "Railway System Operational!", `${sampleSimRoutes.length} trains running in real-time simulation`);
+          }, 500);
         })
         .catch((err) => {
           console.error('Failed to load sample_train_routes.json:', err);
           setStatus('Failed to load main train routes file. Check if sample_train_routes.json exists and is valid JSON.');
+          throw err; // Re-throw to be caught by the calling Promise chain
         });
     }
 
     // Once both tracks and stations are in, initialize
     Promise.all([railwayReady, stationsReady]).then(() => {
       updateVisibilityForZoom();
+      updateLoadingStep(3, "Loading Train Schedules...", "Fetching ultra-optimized train data...");
       
       // Load RAILWAY-ALIGNED ultra-optimized trains for realistic simulation
       fetch('ultra_optimized_trains.json')
-        .then(r => r.ok ? r.text() : Promise.reject(`HTTP ${r.status}`))
+        .then(r => {
+          if (!r.ok) throw new Error(`HTTP ${r.status}`);
+          updateLoadingStep(3, "Loading Ultra-Optimized Trains...", "200 schedules, 318KB - Trains follow actual tracks!");
+          return r.text();
+        })
         .then(text => {
           console.log('Loading RAILWAY-ALIGNED ultra-optimized trains (200 schedules, 318KB) - Trains follow actual tracks!');
+          updateLoadingStep(4, "Starting Train Simulation...", "Initializing real-time train movements...");
           return startSampleRoutesRealtime('ultra_optimized_trains.json');
         })
         .catch((err) => {
           console.error('Failed to load ultra_optimized_trains.json, falling back to minimal:', err);
+          updateLoadingStep(3, "Trying Fallback Data...", "Attempting to load minimal_trains.json...");
+          
           // Fallback cascade: ultra → minimal → optimized
           return fetch('minimal_trains.json')
-            .then(r => r.ok ? r.text() : Promise.reject(`HTTP ${r.status}`))
+            .then(r => {
+              if (!r.ok) throw new Error(`HTTP ${r.status}`);
+              updateLoadingStep(3, "Loading Minimal Trains...", "150 schedules, 195KB fallback data");
+              return r.text();
+            })
             .then(text => {
               console.log('Loading fallback minimal trains (150 schedules, 195KB)');
-              return startSampleRoutesRealtime('ultra_optimized_trains.json');
+              updateLoadingStep(4, "Starting Train Simulation...", "Initializing fallback train data...");
+              return startSampleRoutesRealtime('minimal_trains.json');
             })
             .catch((err2) => {
-              console.error('Failed to load ultra_optimized_trains.json, final fallback to optimized_trains.json:', err2);
+              console.error('Failed to load minimal_trains.json, final fallback to optimized_trains.json:', err2);
+              updateLoadingStep(3, "Final Fallback...", "Loading optimized_trains.json (0.7MB)...");
+              
               return fetch('optimized_trains.json')
-                .then(r => r.ok ? r.text() : Promise.reject(`HTTP ${r.status}`))
+                .then(r => {
+                  if (!r.ok) throw new Error(`HTTP ${r.status}`);
+                  updateLoadingStep(3, "Loading Optimized Trains...", "310 schedules, 0.7MB final fallback");
+                  return r.text();
+                })
                 .then(text => {
                   console.log('Loading final fallback optimized trains (310 schedules, 0.7MB)');
+                  updateLoadingStep(4, "Starting Train Simulation...", "Initializing final fallback data...");
                   return startSampleRoutesRealtime('optimized_trains.json');
                 });
             });
+        })
+        .then(() => {
+          // All loading complete
+          updateLoadingStep(5, "Railway System Ready!", "All data loaded successfully. Trains are now running.");
+          hideLoadingOverlay();
+        })
+        .catch((finalErr) => {
+          console.error('All train data loading attempts failed:', finalErr);
+          showLoadingError(`Failed to load any train data: ${finalErr.message}`);
         });
       
       // Apply initial train marker visibility according to UI toggle
       applyTrainMarkerVisibility();
+    }).catch((err) => {
+      console.error('Failed to load railway or station data:', err);
+      showLoadingError(`Failed to initialize railway system: ${err.message}`);
     });
   </script>
 </body>
