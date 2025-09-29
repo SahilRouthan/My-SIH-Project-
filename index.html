@@ -6,7 +6,19 @@
   <link rel="stylesheet" href="https://unpkg.com/leaflet/dist/leaflet.css" />
   <script src="https://unpkg.com/leaflet/dist/leaflet.js"></script>
   <style>
-    #map { height: 100vh; }
+    #map { 
+      height: 100vh; 
+      /* Hardware acceleration for ultra-smooth zooming */
+      transform: translateZ(0);
+      -webkit-transform: translateZ(0);
+      will-change: transform, opacity;
+      backface-visibility: hidden;
+      -webkit-backface-visibility: hidden;
+      /* Instant zoom response optimizations */
+      image-rendering: -webkit-optimize-contrast;
+      image-rendering: crisp-edges;
+      contain: layout style paint;
+    }
     .controls {
       position: absolute;
       z-index: 1000;
@@ -38,7 +50,36 @@
       font-size: 13px;
       max-width: 50ch;
     }
-    .train-icon { font-size: 20px; }
+    .train-icon { 
+      font-size: 18px; 
+      transition: transform 0.1s cubic-bezier(0.4, 0, 0.2, 1);
+      will-change: transform;
+      filter: drop-shadow(0 1px 2px rgba(0,0,0,0.1));
+      transform-origin: center center;
+    }
+    
+    /* Instant tile loading for zero zoom lag */
+    .leaflet-tile {
+      transition: opacity 0.1s ease-out;
+      image-rendering: -webkit-optimize-contrast;
+      will-change: transform, opacity;
+    }
+    
+    .leaflet-tile-container {
+      transform: translateZ(0);
+      will-change: transform;
+    }
+    
+    /* Instant zoom response */
+    .leaflet-zoom-animated {
+      transition: transform 0.15s cubic-bezier(0.4, 0, 0.2, 1);
+    }
+    
+    /* Preload optimization */
+    .leaflet-tile-pane {
+      will-change: transform;
+      contain: layout style paint;
+    }
     .legend {
       position: absolute;
       z-index: 1000;
@@ -77,10 +118,33 @@
   </div>
 
   <script>
-    // Initialize map centered on India
-    const map = L.map('map').setView([22.8, 79.5], 5);
+    // Preload tiles for instant zoom response
+    const tileCache = new Map();
+    
+    // Initialize map with instant zoom response
+    const map = L.map('map', {
+      zoomAnimation: true,
+      fadeAnimation: true,
+      markerZoomAnimation: true,
+      zoomSnap: 0.1, // Even finer zoom increments for instant response
+      zoomDelta: 0.25, // Smaller zoom steps for smoother feel
+      wheelPxPerZoomLevel: 40, // More responsive mouse wheel
+      wheelDebounceTime: 40, // Faster wheel response
+      bounceAtZoomLimits: false, // No bounce delay at zoom limits
+      preferCanvas: true, // Better performance for many markers
+      renderer: L.canvas({ padding: 0.5 }) // Canvas renderer for instant updates
+    }).setView([22.8, 79.5], 5);
+    
     L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
-      attribution: '© OpenStreetMap contributors'
+      attribution: '© OpenStreetMap contributors',
+      updateWhenIdle: false, // Update tiles during zoom for smoother experience
+      keepBuffer: 8, // Keep even more tiles in memory
+      updateWhenZooming: true, // Immediate tile updates during zoom
+      updateInterval: 50, // Faster tile update interval
+      maxZoom: 18,
+      minZoom: 3,
+      detectRetina: true, // Better tile quality
+      crossOrigin: true
     }).addTo(map);
 
   // Layers and global state
@@ -402,33 +466,89 @@
       }
     function setMarkerVisible(marker, visible) {
       if (!marker) return;
-      marker.setOpacity(visible ? 1 : 0);
-      if (marker.getTooltip && marker.getTooltip()) {
-        if (visible) marker.openTooltip(); else marker.closeTooltip();
-      }
-    }
-    function updateVisibilityForZoom() {
-      const showTrains = map.getZoom() >= markerVisibilityZoom;
-      const showStations = map.getZoom() >= stationVisibilityZoom;
-      // Keep station layer on the map; but only show when zoomed in very close
-      if (stationLayer) {
-        if (!map.hasLayer(stationLayer)) stationLayer.addTo(map);
-        stationLayer.eachLayer(l => { if (l.setStyle) l.setStyle({ opacity: showStations ? 1 : 0, fillOpacity: showStations ? 0.6 : 0 }); });
-      }
-      // Toggle realtime markers opacity
-      if (showTrainMarkers) {
-        realtimeLayer.eachLayer(layer => setMarkerVisible(layer, showTrains));
-      }
-      // Toggle scheduled markers opacity  
-      for (const t of scheduledTrains.values()) {
-        if (!t.marker) continue;
-        if (showTrainMarkers) {
-          const visible = showTrains && !!t.started; // hide if not started
-          setMarkerVisible(t.marker, visible);
+      
+      // Cache current state to avoid unnecessary DOM updates
+      const currentOpacity = marker._currentOpacity;
+      const targetOpacity = visible ? 1 : 0;
+      
+      if (currentOpacity !== targetOpacity) {
+        marker.setOpacity(targetOpacity);
+        marker._currentOpacity = targetOpacity;
+        
+        // Only handle tooltips if they exist and state changed
+        if (marker.getTooltip && marker.getTooltip()) {
+          if (visible) marker.openTooltip(); else marker.closeTooltip();
         }
       }
     }
-    map.on('zoomend', updateVisibilityForZoom);
+    // Zoom-aware performance system for ultra-smooth zooming
+    let zoomTimeout = null;
+    let lastZoomLevel = map.getZoom();
+    let isZooming = false;
+    
+    function updateVisibilityForZoom() {
+      const currentZoom = map.getZoom();
+      const showTrains = currentZoom >= markerVisibilityZoom;
+      const showStations = currentZoom >= stationVisibilityZoom;
+      
+      // More responsive zoom change detection
+      if (Math.abs(currentZoom - lastZoomLevel) < 0.05) return;
+      lastZoomLevel = currentZoom;
+      
+      // Use requestAnimationFrame for smooth updates
+      requestAnimationFrame(() => {
+        // Batch station layer updates
+        if (stationLayer) {
+          if (!map.hasLayer(stationLayer)) stationLayer.addTo(map);
+          // More efficient station visibility toggle
+          const stationOpacity = showStations ? 1 : 0;
+          const stationFillOpacity = showStations ? 0.6 : 0;
+          stationLayer.eachLayer(l => { 
+            if (l.setStyle) l.setStyle({ opacity: stationOpacity, fillOpacity: stationFillOpacity }); 
+          });
+        }
+        
+        // Batch train marker updates only if needed
+        if (showTrainMarkers) {
+          realtimeLayer.eachLayer(layer => setMarkerVisible(layer, showTrains));
+          
+          // More efficient scheduled train updates
+          for (const t of scheduledTrains.values()) {
+            if (!t.marker) continue;
+            const visible = showTrains && !!t.started;
+            setMarkerVisible(t.marker, visible);
+          }
+        }
+      });
+    }
+
+    // Instant zoom handler with zero delay
+    function throttledZoomHandler() {
+      isZooming = true;
+      clearTimeout(zoomTimeout);
+      // Immediate response for instant zoom feel
+      requestAnimationFrame(updateVisibilityForZoom);
+      zoomTimeout = setTimeout(updateVisibilityForZoom, 8); // Double the responsiveness
+    }
+    
+    // Separate handler for zoom end to ensure final state is correct
+    function zoomEndHandler() {
+      clearTimeout(zoomTimeout);
+      // Immediate update on zoom end for accuracy
+      requestAnimationFrame(() => {
+        updateVisibilityForZoom();
+        isZooming = false; // Resume normal train animation performance
+      });
+    }
+    
+    // Start zoom handler to set zooming state
+    function zoomStartHandler() {
+      isZooming = true;
+    }
+    
+    map.on('zoomstart', zoomStartHandler); // Detect zoom start
+    map.on('zoom', throttledZoomHandler); // Smooth updates during zoom
+    map.on('zoomend', zoomEndHandler); // Final accurate update
     const toggleTrainsEl = document.getElementById('toggleTrains');
     if (toggleTrainsEl) {
       toggleTrainsEl.checked = showTrainMarkers;
@@ -1239,11 +1359,14 @@
           let lastFPSTime = performance.now();
           const speedMultiplier = 1.5; // Balanced speed for optimal performance
           
-          // Optimized performance monitoring
+          // Optimized performance monitoring with zoom awareness
           function updatePerformance(activeTrains) {
             frameCount++;
             const now = performance.now();
-            if (now - lastFPSTime >= 1500) { // Less frequent updates for better performance
+            // Skip performance monitoring during zoom for instant response
+            if (isZooming) return;
+            
+            if (now - lastFPSTime >= 2000) { // Even less frequent updates during normal operation
               const fps = Math.round((frameCount * 1000) / (now - lastFPSTime));
               document.getElementById('fps').textContent = fps;
               document.getElementById('trainCount').textContent = activeTrains;
@@ -1263,14 +1386,22 @@
             }
           }
           
-          // Adaptive performance system
-          let performanceLevel = 'high'; // high, medium, low
+          // Google Maps-style adaptive performance system
+          let performanceLevel = 'ultra'; // ultra, high, medium, low
           let skipFrames = 0;
+          let smoothingEnabled = true;
           
           const tick = () => {
-            // Performance adaptive frame skipping
-            if (performanceLevel === 'medium' && skipFrames++ % 2 === 1) return;
-            if (performanceLevel === 'low' && skipFrames++ % 3 !== 0) return;
+            // Instant zoom performance - minimal frame skipping
+            if (isZooming) {
+              // Keep train animations but reduce frequency slightly for instant zoom response
+              if (skipFrames++ % 2 !== 0) return;
+            } else {
+              // Normal performance adaptation when not zooming
+              if (performanceLevel === 'medium' && skipFrames++ % 2 === 1) return;
+              if (performanceLevel === 'low' && skipFrames++ % 3 !== 0) return;
+              // Ultra mode: no frame skipping for maximum smoothness when not zooming
+            }
             
             const baseNow = nowSecOfDay() * speedMultiplier; // Accelerated time for faster movement
             const showByZoom = map.getZoom() >= markerVisibilityZoom;
@@ -1298,20 +1429,55 @@
               try {
                 realtimeSeenAt.set(id, Date.now());
                 let m = realtimeMarkerById.get(id);
-                // Ensure position is ALWAYS on track before creating/updating marker
+                // Google Maps-style smooth interpolation with rotation
                 const trackPos = snapToTrackStrict(pos[0], pos[1]);
-                const finalPos = [trackPos.lat, trackPos.lng];
+                const targetPos = [trackPos.lat, trackPos.lng];
+                
+                // Google Maps-style smooth movement with momentum
+                let rotation = 0;
+                let finalPos = targetPos;
+                if (trainPositions.has(id)) {
+                  const prevData = trainPositions.get(id);
+                  const prevPos = prevData.pos || [prevData[0], prevData[1]]; // Support both formats
+                  
+                  // Smooth position interpolation
+                  finalPos = [
+                    prevPos[0] + (targetPos[0] - prevPos[0]) * interpolationFactor,
+                    prevPos[1] + (targetPos[1] - prevPos[1]) * interpolationFactor
+                  ];
+                  
+                  // Calculate smooth rotation with momentum damping
+                  const dx = targetPos[1] - prevPos[1];
+                  const dy = targetPos[0] - prevPos[0];
+                  if (Math.abs(dx) > 0.0001 || Math.abs(dy) > 0.0001) {
+                    const targetRotation = Math.atan2(dx, dy) * (180 / Math.PI);
+                    const prevRotation = prevData.rotation || 0;
+                    
+                    // Smooth rotation with Google Maps-style momentum
+                    let rotDiff = targetRotation - prevRotation;
+                    if (rotDiff > 180) rotDiff -= 360;
+                    if (rotDiff < -180) rotDiff += 360;
+                    
+                    rotation = prevRotation + (rotDiff * 0.4); // Smooth rotation factor
+                  } else {
+                    rotation = prevData.rotation || 0;
+                  }
+                }
+                trainPositions.set(id, { pos: finalPos, rotation });
                 
                 if (!m) {
-                  const icon = L.divIcon({ className: 'train-icon', html: '🚆', iconSize: [20,20] });
+                  const rotateHtml = `<div style="transform: rotate(${rotation}deg);">🚆</div>`;
+                  const icon = L.divIcon({ className: 'train-icon', html: rotateHtml, iconSize: [18,18] });
                   m = getPooledMarker(finalPos, icon);
-                  m.bindTooltip(id, { permanent: true, direction: 'top', offset: [0, -10], className: 'train-label' });
+                  m.bindTooltip(id, { permanent: false, direction: 'top', offset: [0, -8], className: 'train-label' });
                   m.setOpacity(showByZoom ? 1 : 0);
                   m.addTo(realtimeLayer);
                   realtimeMarkerById.set(id, m);
                 } else {
-                  // Force track-aligned position update
+                  // Google Maps-style smooth position and rotation updates
                   m.setLatLng(finalPos);
+                  const rotateHtml = `<div style="transform: rotate(${rotation}deg);">🚆</div>`;
+                  m.setIcon(L.divIcon({ className: 'train-icon', html: rotateHtml, iconSize: [18,18] }));
                   m.setOpacity(showByZoom ? 1 : 0);
                 }
                 if (showTrainMarkers && !map.hasLayer(realtimeLayer)) map.addLayer(realtimeLayer);
@@ -1366,10 +1532,14 @@
           };
           tick();
           if (sampleSimInterval) clearInterval(sampleSimInterval);
-          // Optimized animation with adaptive FPS for best performance
+          // Google Maps level smoothness - 60 FPS with interpolation
           let lastUpdate = 0;
-          const targetFPS = 45; // Balanced FPS for smooth performance
+          const targetFPS = 60; // Google Maps smoothness
           const frameInterval = 1000 / targetFPS;
+          
+          // Smooth interpolation system for Google Maps-like movement
+          const trainPositions = new Map(); // Store previous positions for interpolation
+          const interpolationFactor = 0.15; // Smooth transition factor
           
           function smoothTick() {
             const now = performance.now();
