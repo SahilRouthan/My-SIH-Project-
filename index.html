@@ -89,6 +89,29 @@
     const realtimeLayer = L.layerGroup().addTo(map); // holds realtime train markers
     const stationIndex = new Map(); // name -> {lat, lng}
   const stationIndexCi = new Map(); // lowercased name -> {lat, lng}
+    
+    // Object pooling for better performance
+    const markerPool = [];
+    const maxPoolSize = 150;
+    
+    function getPooledMarker(pos, icon) {
+      if (markerPool.length > 0) {
+        const marker = markerPool.pop();
+        marker.setLatLng(pos);
+        marker.setIcon(icon);
+        return marker;
+      }
+      return L.marker(pos, { icon });
+    }
+    
+    function returnMarkerToPool(marker) {
+      if (markerPool.length < maxPoolSize) {
+        marker.removeFrom(map);
+        markerPool.push(marker);
+      } else {
+        map.removeLayer(marker);
+      }
+    }
 
     // Graph of railway vertices
     const graph = new Map(); // key -> { lat, lng, neighbors: Map(key, distanceKm) }
@@ -637,10 +660,10 @@
       const departMs = startNow ? 0 : parseDepartOffsetMs(entry.depart ?? entry.departAt ?? entry.departure ?? entry.departureTime ?? 0);
       const latlngObjs = routeObj.latlngs;
 
-      // Visible polyline rendering - show at default zoom
-      const shouldShowLine = trainRoutes.length < 30 && map.getZoom() >= 5;
+      // Performance-optimized polyline rendering
+      const shouldShowLine = trainRoutes.length < 25 && map.getZoom() >= 6;
       const line = shouldShowLine ? 
-        L.polyline(latlngObjs, { color, weight: 2, opacity: 0.7 }).addTo(map) : 
+        L.polyline(latlngObjs, { color, weight: 1.5, opacity: 0.6 }).addTo(map) : 
         null;
       const icon = L.divIcon({ className: 'train-icon', html: '🚆', iconSize: [22,22] });
   const marker = L.marker(latlngObjs[0], { icon });
@@ -1157,7 +1180,7 @@
           console.log(`Found ${trains.length} trains in dataset`);
           sampleSimRoutes = [];
           const params = new URLSearchParams(window.location.search);
-          const sampleLimit = Number(params.get('sampleLimit') || 100); // Increased for better simulation coverage
+          const sampleLimit = Number(params.get('sampleLimit') || 75); // Optimized for best performance balance
           let added = 0;
           for (const tr of trains) {
             if (added >= sampleLimit) break;
@@ -1210,22 +1233,41 @@
           let tickCount = 0;
           let frameCount = 0;
           let lastFPSTime = performance.now();
-          const speedMultiplier = 2; // Make trains move 2x faster for more dynamic simulation
+          const speedMultiplier = 1.5; // Balanced speed for optimal performance
           
-          // Performance monitoring
+          // Optimized performance monitoring
           function updatePerformance(activeTrains) {
             frameCount++;
             const now = performance.now();
-            if (now - lastFPSTime >= 1000) {
+            if (now - lastFPSTime >= 1500) { // Less frequent updates for better performance
               const fps = Math.round((frameCount * 1000) / (now - lastFPSTime));
               document.getElementById('fps').textContent = fps;
               document.getElementById('trainCount').textContent = activeTrains;
+              document.getElementById('fps').style.color = fps >= 40 ? '#4CAF50' : fps >= 25 ? '#FF9800' : '#F44336';
+              
+              // Auto-adjust performance level based on FPS
+              if (fps < 20) {
+                performanceLevel = 'low';
+              } else if (fps < 35) {
+                performanceLevel = 'medium';
+              } else {
+                performanceLevel = 'high';
+              }
+              
               frameCount = 0;
               lastFPSTime = now;
             }
           }
           
+          // Adaptive performance system
+          let performanceLevel = 'high'; // high, medium, low
+          let skipFrames = 0;
+          
           const tick = () => {
+            // Performance adaptive frame skipping
+            if (performanceLevel === 'medium' && skipFrames++ % 2 === 1) return;
+            if (performanceLevel === 'low' && skipFrames++ % 3 !== 0) return;
+            
             const baseNow = nowSecOfDay() * speedMultiplier; // Accelerated time for faster movement
             const showByZoom = map.getZoom() >= markerVisibilityZoom;
             const offsets = [-86400, 0, 86400];
@@ -1239,8 +1281,8 @@
                 const r = (tNow - tr.t0) / (tr.t1 - tr.t0);
                 const targetKm = r * tr.totalKm;
                 pos = posAlongPolyline(tr.coords, tr.cum, targetKm);
-                // Optimized snapping - less frequent for faster performance
-                if (pos && tickCount % 2 === 0) { // Snap every 2nd frame for better performance
+                // Ultra-optimized snapping - every 3rd frame for maximum performance
+                if (pos && tickCount % 3 === 0) { // Reduced snapping frequency for speed
                   const snapped = snapToTrackStrict(pos[0], pos[1]);
                   pos = [snapped.lat, snapped.lng];
                 }
@@ -1254,7 +1296,7 @@
                 let m = realtimeMarkerById.get(id);
                 if (!m) {
                   const icon = L.divIcon({ className: 'train-icon', html: '🚆', iconSize: [20,20] });
-                  m = L.marker(pos, { icon });
+                  m = getPooledMarker(pos, icon);
                   m.bindTooltip(id, { permanent: true, direction: 'top', offset: [0, -10], className: 'train-label' });
                   m.setOpacity(showByZoom ? 1 : 0);
                   m.addTo(realtimeLayer);
@@ -1292,7 +1334,7 @@
                   if (now - lastSeen > 90000) { // Longer retention for better performance
                     const marker = realtimeMarkerById.get(id);
                     if (marker) {
-                      map.removeLayer(marker);
+                      returnMarkerToPool(marker);
                       realtimeMarkerById.delete(id);
                     }
                     realtimeSeenAt.delete(id);
@@ -1303,9 +1345,9 @@
           };
           tick();
           if (sampleSimInterval) clearInterval(sampleSimInterval);
-          // Ultra-smooth animation with 60 FPS for faster, responsive simulation
+          // Optimized animation with adaptive FPS for best performance
           let lastUpdate = 0;
-          const targetFPS = 60; // Increased to 60 FPS for ultra-smooth animation
+          const targetFPS = 45; // Balanced FPS for smooth performance
           const frameInterval = 1000 / targetFPS;
           
           function smoothTick() {
