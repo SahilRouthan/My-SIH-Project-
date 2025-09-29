@@ -148,6 +148,19 @@
       return { lat: n.lat, lng: n.lng };
     }
 
+    // Enhanced snapping for better track alignment
+    function snapToTrackStrict(lat, lng) {
+      const result = snapLatLngToTrack(lat, lng, 8); // Larger search radius
+      // If still far from track, try a more aggressive search
+      if (!nodeKeys.length) return { lat, lng };
+      const { distKm } = findNearestNode(result.lat, result.lng);
+      if (distKm > 1) {
+        // Try finding nearest track with larger radius
+        return snapLatLngToTrack(lat, lng, 15);
+      }
+      return result;
+    }
+
     // Min-heap priority queue for Dijkstra
     class MinHeap {
       constructor() { this.a = []; }
@@ -1193,9 +1206,9 @@
                 const r = (tNow - tr.t0) / (tr.t1 - tr.t0);
                 const targetKm = r * tr.totalKm;
                 pos = posAlongPolyline(tr.coords, tr.cum, targetKm);
-                // Always snap to track for accuracy (using smaller radius for performance)
+                // Enhanced snapping to keep trains strictly on railway tracks
                 if (pos) {
-                  const snapped = snapLatLngToTrack(pos[0], pos[1], 2.5);
+                  const snapped = snapToTrackStrict(pos[0], pos[1]);
                   pos = [snapped.lat, snapped.lng];
                 }
                 break;
